@@ -55,7 +55,7 @@ const Navbar = () => {
             About
           </Link>
 
-          <Link to="/signin">
+          <Link to="/signup">
             <ButtonNav name="Sign Up" />
           </Link>
 
