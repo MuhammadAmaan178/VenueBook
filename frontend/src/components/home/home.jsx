@@ -1,11 +1,25 @@
-import React from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect } from "react";
+import { Link, useLocation } from "react-router-dom";
 import Button from "./Button.jsx";
 import CardHome from "./CardHome.jsx";
+import Footer from "../Footer.jsx";
+import Navbar from "../Navbar/Navbar.jsx";
 
 const Home = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (location.state?.scrollToFooter) {
+      const footer = document.getElementById('footer');
+      if (footer) {
+        footer.scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+  }, [location]);
+
   return (
     <div className="w-full">
+      <Navbar />
       {/* Hero Section */}
       <div className="bg-purple-300 py-20 text-center">
         <h1 className="text-4xl font-extrabold text-gray-800 mb-4">
@@ -59,22 +73,7 @@ const Home = () => {
       </section>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-gray-300 text-center py-10">
-        <p>📞 Contact Us</p>
-        <p>Email: support@venuefinder.com</p>
-        <p>Phone: +92-300-1234567</p>
-
-        <div className="mt-5">
-          <p className="font-semibold">👨‍💻 Developers Team</p>
-          <p>1. Muhammad Amaan</p>
-          <p>2. Muhammad Nihal Sheikh</p>
-          <p>3. Saad Baseer</p>
-        </div>
-
-        <p className="text-sm mt-6">
-          © 2025 Venue Finder | All Rights Reserved
-        </p>
-      </footer>
+      <Footer />
     </div>
   );
 };

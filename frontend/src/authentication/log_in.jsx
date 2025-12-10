@@ -10,17 +10,39 @@ export default function Login() {
     formState: { errors },
   } = useForm();
 
-  const onSubmit = (data) => {
-    console.log("LOGIN DATA:", data);
-    // API call to /login can be added here
+  const onSubmit = async (data) => {
+    try {
+      console.log('Attempting login with:', data);
+
+      // Call the API service
+      const response = await authAPI.login({
+        email: data.email,
+        password: data.password
+      });
+
+      console.log('Login successful:', response);
+
+      // Store token in localStorage
+      localStorage.setItem('token', response.token);
+      localStorage.setItem('user', JSON.stringify(response.user));
+
+      // Redirect based on role
+      // All users go to venues page
+      window.location.href = '/venues';
+
+    } catch (error) {
+      console.error('Login failed:', error.message);
+      // Show error to user
+      alert('Login failed: ' + error.message);
+    }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       {/* Back to Home Link */}
       <div className="absolute top-6 left-6">
-        <Link 
-          to="/" 
+        <Link
+          to="/"
           className="text-gray-600 hover:text-gray-900 font-medium flex items-center"
         >
           ← Back to home
@@ -104,8 +126,8 @@ export default function Login() {
           <div className="text-center mt-6 pt-6 border-t border-gray-200">
             <p className="text-gray-600">
               Don't have an account?{" "}
-              <Link 
-                to="/signup" 
+              <Link
+                to="/signup"
                 className="text-blue-600 hover:text-blue-700 font-semibold"
               >
                 Sign-up Here
@@ -122,26 +144,3 @@ export default function Login() {
     </div>
   );
 }
-
-// In your Login component
-const onSubmit = async (data) => {
-  try {
-    const response = await authAPI.login(data.email, data.password);
-    console.log('Login successful:', response);
-    
-    // Store token in localStorage
-    localStorage.setItem('token', response.token);
-    localStorage.setItem('user', JSON.stringify(response.user));
-    
-    // Redirect based on role
-    if (response.user.role === 'owner') {
-      window.location.href = '/owner/dashboard';
-    } else {
-      window.location.href = '/';
-    }
-  } catch (error) {
-    console.error('Login failed:', error.message);
-    // Show error to user
-    alert(error.message);
-  }
-};

@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { authAPI } from '../services/api';
 
 export default function Signup() {
-  const [userType, setUserType] = useState("customer");
+  const [userType, setUserType] = useState("user");
+  const navigate = useNavigate();
 
   const {
     register,
@@ -11,17 +13,80 @@ export default function Signup() {
     formState: { errors },
   } = useForm();
 
-  const onSubmit = (data) => {
-    data.role = userType;
-    console.log("FORM SUBMITTED:", data);
+  const formatPhoneNumber = (phone) => {
+    if (!phone) return null;
+    // Assuming phone is like 03001234567
+    // Convert to +92-300-1234567
+    const cleaned = phone.replace(/\D/g, '');
+    if (cleaned.length === 11 && cleaned.startsWith('03')) {
+      return `+92-${cleaned.slice(1, 4)}-${cleaned.slice(4)}`;
+    }
+    return phone;
+  };
+
+
+  const onSubmit = async (data) => {
+    try {
+      const userData = {
+        name: data.fullName,
+        email: data.email,
+        password: data.password,
+        phone: data.phone ? `+92${data.phone.slice(1)}` : null, // Format for API
+        role: userType, // 'user' or 'owner'
+      };
+
+      // Add owner-specific fields if applicable
+      if (userType === 'owner') {
+        userData.business_name = data.businessName;
+        userData.cnic = data.cnic;
+      }
+
+      console.log('Registering user:', userData);
+
+      // Call the API service
+      const response = await authAPI.signup(userData);
+      console.log('Registration successful:', response);
+
+      // After successful registration, auto-login
+      const loginResponse = await authAPI.login({
+        email: data.email,
+        password: data.password
+      });
+
+      // Store token and user data
+      localStorage.setItem('token', loginResponse.token);
+      localStorage.setItem('user', JSON.stringify(loginResponse.user));
+
+      // Redirect based on role
+      // All users go to venues page
+      window.location.href = '/venues';
+
+    } catch (error) {
+      console.error('Registration failed:', error.message);
+
+      // Check if it's an "email already exists" error
+      if (error.message.toLowerCase().includes('email already exists')) {
+        const goToLogin = window.confirm(
+          '⚠️ This email is already registered!\n\n' +
+          'Would you like to go to the login page instead?\n\n' +
+          'Click OK to login, or Cancel to try a different email.'
+        );
+
+        if (goToLogin) {
+          navigate('/login');
+        }
+      } else {
+        alert('Registration failed: ' + error.message);
+      }
+    }
   };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
       {/* Back to Home Link */}
       <div className="absolute top-6 left-6">
-        <Link 
-          to="/" 
+        <Link
+          to="/"
           className="text-gray-600 hover:text-gray-900 font-medium flex items-center"
         >
           ← Back to home
@@ -157,8 +222,8 @@ export default function Signup() {
                   <input
                     type="radio"
                     name="userType"
-                    value="customer"
-                    checked={userType === "customer"}
+                    value="user"
+                    checked={userType === "user"}
                     onChange={(e) => setUserType(e.target.value)}
                     className="h-4 w-4 text-blue-600 focus:ring-blue-500"
                   />
@@ -175,7 +240,7 @@ export default function Signup() {
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
                   Business Information
                 </h3>
-                
+
                 {/* Business Name */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -237,8 +302,8 @@ export default function Signup() {
           <div className="text-center mt-6 pt-6 border-t border-gray-200">
             <p className="text-gray-600">
               Already have an account?{" "}
-              <Link 
-                to="/login" 
+              <Link
+                to="/login"
                 className="text-blue-600 hover:text-blue-700 font-semibold"
               >
                 Login Here
@@ -255,35 +320,3 @@ export default function Signup() {
     </div>
   );
 }
-
-// In your Signup component
-const onSubmit = async (data) => {
-  try {
-    const userData = {
-      name: data.fullName,
-      email: data.email,
-      password: data.password,
-      phone: data.phone,
-      role: userType, // 'customer' or 'owner'
-      business_name: userType === 'owner' ? data.businessName : null,
-      cnic: userType === 'owner' ? data.cnic : null
-    };
-
-    const response = await authAPI.register(userData);
-    console.log('Registration successful:', response);
-    
-    // Store token and redirect
-    localStorage.setItem('token', response.token);
-    localStorage.setItem('user', JSON.stringify(response.user));
-    
-    // Redirect based on role
-    if (response.user.role === 'owner') {
-      window.location.href = '/owner/dashboard';
-    } else {
-      window.location.href = '/';
-    }
-  } catch (error) {
-    console.error('Registration failed:', error.message);
-    alert(error.message);
-  }
-};
