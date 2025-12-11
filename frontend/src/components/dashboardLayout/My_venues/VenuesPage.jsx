@@ -101,19 +101,7 @@ const VenuesPage = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this venue?")) return;
-    try {
-      const token = localStorage.getItem('token');
-      const ownerId = user?.owner_id || user?.user_id || user?.id;
-      await ownerService.deleteVenue(ownerId, id, token);
-      alert("Venue deleted successfully!");
-      fetchVenues();
-    } catch (error) {
-      console.error("Delete failed", error);
-      alert(error.message || "Failed to delete venue");
-    }
-  };
+
 
   const handleExport = () => {
     if (!venues.length) return alert("No venues to export");
@@ -258,7 +246,7 @@ const VenuesPage = () => {
           No venues found. {searchTerm || filters.status || filters.city ? 'Try adjusting your filters.' : 'Add your first venue!'}
         </div>
       ) : (
-        <VenuesTable venues={venues} onEdit={handleEdit} onDelete={handleDelete} onView={handleView} />
+        <VenuesTable venues={venues} onEdit={handleEdit} onView={handleView} />
       )}
 
       <AddVenueForm

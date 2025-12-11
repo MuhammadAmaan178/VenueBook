@@ -6,6 +6,7 @@ import { DollarSign, Calendar, TrendingUp } from 'lucide-react';
 const AnalyticsPage = () => {
     const [stats, setStats] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
     const { user } = useAuth ? useAuth() : {};
 
     useEffect(() => {
@@ -22,7 +23,8 @@ const AnalyticsPage = () => {
 
                 if (user.role === 'owner') {
                     const ownerId = user.owner_id || user.user_id;
-                    const data = await ownerService.getAnalytics(ownerId, token);
+                    // Fetch analytics with selected year parameter
+                    const data = await ownerService.getAnalytics(ownerId, token, selectedYear);
                     setStats(data);
                 } else {
                     console.error('Invalid user role for analytics');
@@ -39,7 +41,7 @@ const AnalyticsPage = () => {
         if (user) {
             fetchAnalytics();
         }
-    }, [user]);
+    }, [user, selectedYear]);
 
     if (loading) {
         return <div className="p-6 text-center text-gray-500">Loading analytics...</div>;
@@ -49,24 +51,35 @@ const AnalyticsPage = () => {
         return <div className="p-6 text-center text-gray-500">No data available</div>;
     }
 
-    // Process Yearly Data for Line Chart
-    const processYearlyData = (backendData) => {
-        const years = [];
-        const currentYear = new Date().getFullYear();
-        // Show last 5 years
-        for (let i = 4; i >= 0; i--) {
-            const year = String(currentYear - i);
-            const found = backendData?.find(item => item.year === year);
-            years.push({
-                year: year,
+    // Process Monthly Data for selected year
+    const processMonthlyData = (backendData) => {
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthlyRevenue = [];
+
+        for (let i = 1; i <= 12; i++) {
+            const monthStr = String(i).padStart(2, '0');
+            const found = backendData?.find(item => item.month === monthStr);
+            monthlyRevenue.push({
+                month: months[i - 1],
                 revenue: found ? parseFloat(found.revenue) : 0
             });
         }
-        return years;
+        return monthlyRevenue;
     };
 
-    const yearlyData = stats ? processYearlyData(stats.yearly) : [];
-    const maxRevenue = Math.max(...yearlyData.map(y => y.revenue), 1000);
+    // Use monthly data if available, otherwise show message
+    const chartData = stats?.monthly ? processMonthlyData(stats.monthly) : [];
+    const maxRevenue = chartData.length > 0 ? Math.max(...chartData.map(d => d.revenue), 1000) : 1000;
+
+    // Get available years from yearly data
+    const availableYears = stats?.yearly ? stats.yearly.map(y => parseInt(y.year)).sort((a, b) => b - a) : [];
+    if (availableYears.length > 0 && !availableYears.includes(selectedYear)) {
+        // If selected year is not in available years, add current year
+        const currentYear = new Date().getFullYear();
+        if (!availableYears.includes(currentYear)) {
+            availableYears.unshift(currentYear);
+        }
+    }
 
     // SVG Line Chart Helpers
     const chartHeight = 250;
@@ -75,14 +88,14 @@ const AnalyticsPage = () => {
     const availableWidth = chartWidth - (padding * 2);
     const availableHeight = chartHeight - (padding * 2);
 
-    const getX = (index) => padding + (index * (availableWidth / (yearlyData.length - 1)));
+    const getX = (index) => padding + (index * (availableWidth / (chartData.length - 1)));
     const getY = (value) => chartHeight - padding - ((value / maxRevenue) * availableHeight);
 
     // Generate path for the line
     const generatePath = () => {
-        if (yearlyData.length === 0) return "";
-        let pathD = `M ${getX(0)} ${getY(yearlyData[0].revenue)}`;
-        yearlyData.forEach((point, index) => {
+        if (chartData.length === 0) return "";
+        let pathD = `M ${getX(0)} ${getY(chartData[0].revenue)}`;
+        chartData.forEach((point, index) => {
             if (index === 0) return;
             pathD += ` L ${getX(index)} ${getY(point.revenue)}`;
         });
@@ -91,13 +104,13 @@ const AnalyticsPage = () => {
 
     // Generate path for the area fill (optional, looks nice)
     const generateArea = () => {
-        if (yearlyData.length === 0) return "";
-        let pathD = `M ${getX(0)} ${getY(yearlyData[0].revenue)}`;
-        yearlyData.forEach((point, index) => {
+        if (chartData.length === 0) return "";
+        let pathD = `M ${getX(0)} ${getY(chartData[0].revenue)}`;
+        chartData.forEach((point, index) => {
             if (index === 0) return;
             pathD += ` L ${getX(index)} ${getY(point.revenue)}`;
         });
-        pathD += ` L ${getX(yearlyData.length - 1)} ${chartHeight - padding} L ${getX(0)} ${chartHeight - padding} Z`;
+        pathD += ` L ${getX(chartData.length - 1)} ${chartHeight - padding} L ${getX(0)} ${chartHeight - padding} Z`;
         return pathD;
     };
 
@@ -145,82 +158,103 @@ const AnalyticsPage = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Yearly Revenue Line Chart */}
+                {/* Monthly Revenue Line Chart */}
                 <div className="bg-white p-6 rounded-xl border shadow-sm">
-                    <h3 className="text-lg font-bold text-gray-800 mb-6">Yearly Revenue Trend</h3>
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-bold text-gray-800">Monthly Revenue Trend</h3>
+                        <select
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                            className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            {availableYears.length > 0 ? (
+                                availableYears.map(year => (
+                                    <option key={year} value={year}>{year}</option>
+                                ))
+                            ) : (
+                                <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>
+                            )}
+                        </select>
+                    </div>
                     <div className="w-full h-64 overflow-hidden relative">
-                        <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-full overflow-visible">
-                            {/* Background Lines */}
-                            {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
-                                const y = chartHeight - padding - (tick * availableHeight);
-                                return (
-                                    <line
-                                        key={tick}
-                                        x1={padding}
-                                        y1={y}
-                                        x2={chartWidth - padding}
-                                        y2={y}
-                                        stroke="#e5e7eb"
-                                        strokeWidth="1"
-                                    />
-                                );
-                            })}
-
-                            {/* Area Fill */}
-                            <path d={generateArea()} fill="rgba(59, 130, 246, 0.1)" />
-
-                            {/* Line Path */}
-                            <path
-                                d={generatePath()}
-                                fill="none"
-                                stroke="#3b82f6"
-                                strokeWidth="3"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-
-                            {/* Data Points */}
-                            {yearlyData.map((d, i) => (
-                                <g key={i} className="group cursor-pointer">
-                                    <circle
-                                        cx={getX(i)}
-                                        cy={getY(d.revenue)}
-                                        r="5"
-                                        className="fill-blue-600 stroke-white stroke-2 hover:r-7 transition-all duration-300"
-                                    />
-                                    {/* Tooltip on Hover */}
-                                    <g className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                                        <rect
-                                            x={getX(i) - 40}
-                                            y={getY(d.revenue) - 40}
-                                            width="80"
-                                            height="30"
-                                            rx="4"
-                                            fill="#1f2937"
+                        {chartData.length > 0 ? (
+                            <svg viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="w-full h-full overflow-visible">
+                                {/* Background Lines */}
+                                {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
+                                    const y = chartHeight - padding - (tick * availableHeight);
+                                    return (
+                                        <line
+                                            key={tick}
+                                            x1={padding}
+                                            y1={y}
+                                            x2={chartWidth - padding}
+                                            y2={y}
+                                            stroke="#e5e7eb"
+                                            strokeWidth="1"
                                         />
+                                    );
+                                })}
+
+                                {/* Area Fill */}
+                                <path d={generateArea()} fill="rgba(59, 130, 246, 0.1)" />
+
+                                {/* Line Path */}
+                                <path
+                                    d={generatePath()}
+                                    fill="none"
+                                    stroke="#3b82f6"
+                                    strokeWidth="3"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                />
+
+                                {/* Data Points */}
+                                {chartData.map((d, i) => (
+                                    <g key={i} className="group cursor-pointer">
+                                        <circle
+                                            cx={getX(i)}
+                                            cy={getY(d.revenue)}
+                                            r="5"
+                                            className="fill-blue-600 stroke-white stroke-2 hover:r-7 transition-all duration-300"
+                                        />
+                                        {/* Tooltip on Hover */}
+                                        <g className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+                                            <rect
+                                                x={getX(i) - 40}
+                                                y={getY(d.revenue) - 40}
+                                                width="80"
+                                                height="30"
+                                                rx="4"
+                                                fill="#1f2937"
+                                            />
+                                            <text
+                                                x={getX(i)}
+                                                y={getY(d.revenue) - 20}
+                                                textAnchor="middle"
+                                                fontSize="12"
+                                                fill="white"
+                                            >
+                                                Rs. {d.revenue / 1000}k
+                                            </text>
+                                        </g>
+                                        {/* Month Label */}
                                         <text
                                             x={getX(i)}
-                                            y={getY(d.revenue) - 20}
+                                            y={chartHeight - 10}
                                             textAnchor="middle"
+                                            className="text-xs fill-gray-500"
                                             fontSize="12"
-                                            fill="white"
                                         >
-                                            Rs. {d.revenue / 1000}k
+                                            {d.month}
                                         </text>
                                     </g>
-                                    {/* Year Label */}
-                                    <text
-                                        x={getX(i)}
-                                        y={chartHeight - 10}
-                                        textAnchor="middle"
-                                        className="text-xs fill-gray-500"
-                                        fontSize="12"
-                                    >
-                                        {d.year}
-                                    </text>
-                                </g>
-                            ))}
-                        </svg>
+                                ))}
+                            </svg>
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-gray-500">
+                                No data available for {selectedYear}
+                            </div>
+                        )}
                     </div>
                 </div>
 

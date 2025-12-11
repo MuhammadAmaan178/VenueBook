@@ -38,8 +38,8 @@ const BookingInformation = ({ data, onUpdate, onNext }) => {
                 type="button"
                 onClick={() => handleChange('eventType', type)}
                 className={`px-4 py-3 rounded-lg border text-center transition-colors ${data.eventType === type
-                    ? 'bg-blue-50 border-blue-500 text-blue-700'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  ? 'bg-blue-50 border-blue-500 text-blue-700'
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
                   }`}
               >
                 {type}
@@ -300,8 +300,8 @@ const AdditionalServices = ({ data, onUpdate, onNext, onBack }) => {
               <div
                 key={service.id}
                 className={`p-4 border rounded-lg cursor-pointer transition-all ${isSelected
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-300 hover:border-blue-300'
+                  ? 'border-blue-500 bg-blue-50'
+                  : 'border-gray-300 hover:border-blue-300'
                   }`}
                 onClick={() => handleServiceToggle(service.id)}
               >
@@ -336,8 +336,8 @@ const AdditionalServices = ({ data, onUpdate, onNext, onBack }) => {
             <button
               onClick={() => handlePaymentMethodSelect('bank')}
               className={`p-4 border rounded-lg text-left transition-all ${data.paymentMethod === 'bank'
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-300 hover:border-blue-300'
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-300 hover:border-blue-300'
                 }`}
             >
               <h3 className="font-medium text-gray-800 mb-1">Bank Transfer</h3>
@@ -347,8 +347,8 @@ const AdditionalServices = ({ data, onUpdate, onNext, onBack }) => {
             <button
               onClick={() => handlePaymentMethodSelect('cash')}
               className={`p-4 border rounded-lg text-left transition-all ${data.paymentMethod === 'cash'
-                  ? 'border-blue-500 bg-blue-50'
-                  : 'border-gray-300 hover:border-blue-300'
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-gray-300 hover:border-blue-300'
                 }`}
             >
               <h3 className="font-medium text-gray-800 mb-1">Cash Payment</h3>
@@ -779,10 +779,10 @@ const EventBookingForm = () => {
               <React.Fragment key={step}>
                 <div className="flex items-center">
                   <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-semibold text-sm md:text-base ${currentStep > index + 1
-                      ? 'bg-green-500 text-white'
-                      : currentStep === index + 1
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-300 text-gray-700'
+                    ? 'bg-green-500 text-white'
+                    : currentStep === index + 1
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-300 text-gray-700'
                     }`}>
                     {index + 1}
                   </div>

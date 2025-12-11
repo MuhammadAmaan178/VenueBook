@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Download, X, Eye } from 'lucide-react';
+import { Search, Filter, Download, X, Eye, Check, XCircle } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ownerService, adminService } from '../../../services/api';
 import BookingDetailsModal from '../modals/BookingDetailsModal';
@@ -11,6 +11,7 @@ const BookingsPage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedBooking, setSelectedBooking] = useState(null);
     const [showBookingDetails, setShowBookingDetails] = useState(false);
+    const [updatingStatus, setUpdatingStatus] = useState({});
 
     const [filters, setFilters] = useState({
         status: '',
@@ -80,6 +81,26 @@ const BookingsPage = () => {
         } catch (error) {
             console.error('Error fetching booking details:', error);
             alert('Failed to load booking details');
+        }
+    };
+
+    const handleStatusUpdate = async (bookingId, newStatus) => {
+        try {
+            setUpdatingStatus(prev => ({ ...prev, [bookingId]: true }));
+            const token = localStorage.getItem('token');
+            const ownerId = user.owner_id || user.user_id;
+
+            await ownerService.updateBookingStatus(ownerId, bookingId, { status: newStatus }, token);
+
+            // Refresh bookings list
+            await fetchBookings();
+
+            alert(`Booking ${newStatus === 'confirmed' ? 'confirmed' : 'cancelled'} successfully!`);
+        } catch (error) {
+            console.error('Error updating booking status:', error);
+            alert(`Failed to ${newStatus === 'confirmed' ? 'confirm' : 'cancel'} booking. Please try again.`);
+        } finally {
+            setUpdatingStatus(prev => ({ ...prev, [bookingId]: false }));
         }
     };
 
@@ -325,13 +346,36 @@ const BookingsPage = () => {
                                             {formatDate(booking.event_date)}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <button
-                                                onClick={() => handleViewBooking(booking.booking_id)}
-                                                className="p-2 hover:bg-blue-100 rounded-lg transition"
-                                                title="View Details"
-                                            >
-                                                <Eye size={18} className="text-blue-600" />
-                                            </button>
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={() => handleViewBooking(booking.booking_id)}
+                                                    className="p-2 hover:bg-blue-100 rounded-lg transition"
+                                                    title="View Details"
+                                                >
+                                                    <Eye size={18} className="text-blue-600" />
+                                                </button>
+
+                                                {booking.status?.toLowerCase() === 'pending' && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => handleStatusUpdate(booking.booking_id, 'confirmed')}
+                                                            disabled={updatingStatus[booking.booking_id]}
+                                                            className="p-2 hover:bg-green-100 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            title="Confirm Booking"
+                                                        >
+                                                            <Check size={18} className="text-green-600" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleStatusUpdate(booking.booking_id, 'cancelled')}
+                                                            disabled={updatingStatus[booking.booking_id]}
+                                                            className="p-2 hover:bg-red-100 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                                                            title="Cancel Booking"
+                                                        >
+                                                            <XCircle size={18} className="text-red-600" />
+                                                        </button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))

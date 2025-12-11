@@ -7,6 +7,8 @@ from flask import Blueprint, request, jsonify
 
 from utils.db import get_db_connection
 from utils.decorators import token_required
+from utils.log_utils import log_booking_action, log_review_action
+from utils.notification_utils import notify_booking_created, notify_new_review
 
 bookings_bp = Blueprint('bookings', __name__, url_prefix='/api/bookings')
 
@@ -107,6 +109,12 @@ def create_booking():
         cursor.close()
         conn.close()
         
+        # Log booking creation
+        log_booking_action(request.user_id, 'create', booking_id, f"Created {event_type} booking for venue #{venue_id}")
+        
+        # Send notification to owner
+        notify_booking_created(booking_id)
+        
         return jsonify({
             'message': 'Booking created successfully',
             'booking_id': booking_id
@@ -177,6 +185,14 @@ def submit_review(booking_id):
         conn.commit()
         cursor.close()
         conn.close()
+        
+        review_id = cursor.lastrowid
+        
+        # Log review submission
+        log_review_action(request.user_id, 'create', review_id, f"Submitted {rating}-star review for booking #{booking_id}")
+        
+        # Notify owner of new review
+        notify_new_review(booking['venue_id'], rating)
         
         return jsonify({'message': 'Review submitted successfully'}), 201
         

@@ -6,6 +6,7 @@ import { ownerService, adminService } from '../../../services/api';
 const PaymentsPage = () => {
     const [payments, setPayments] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
     const [showFilters, setShowFilters] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -24,9 +25,9 @@ const PaymentsPage = () => {
         try {
             const token = localStorage.getItem('token');
             const ownerId = user.owner_id || user.user_id;
-            
+
             await ownerService.updatePaymentStatus(ownerId, paymentId, newStatus, token);
-            
+
             // Refresh payments list
             fetchPayments();
             alert(`Payment marked as ${newStatus} successfully`);
@@ -39,10 +40,12 @@ const PaymentsPage = () => {
     const fetchPayments = async () => {
         try {
             setLoading(true);
+            setError(null);
             const token = localStorage.getItem('token');
 
             if (!token || !user) {
                 console.error('No authentication token or user found');
+                setError('Authentication required');
                 setLoading(false);
                 return;
             }
@@ -54,21 +57,27 @@ const PaymentsPage = () => {
             if (filters.date_start) filterParams.date_start = filters.date_start;
             if (filters.date_end) filterParams.date_end = filters.date_end;
 
+            console.log('Fetching payments with filters:', filterParams);
+
             let data;
             if (user.role === 'admin') {
                 data = await adminService.getPayments(filterParams, token);
             } else if (user.role === 'owner') {
                 const ownerId = user.owner_id || user.user_id;
+                console.log('Fetching for owner:', ownerId);
                 data = await ownerService.getPayments(ownerId, filterParams, token);
             } else {
-                console.error('Invalid user role');
+                console.error('Invalid user role:', user.role);
+                setError('Invalid user role');
                 setLoading(false);
                 return;
             }
 
+            console.log('Payments data received:', data);
             setPayments(data.payments || []);
         } catch (error) {
             console.error("Error fetching payments:", error);
+            setError(error.message || 'Failed to load payments');
             setPayments([]);
         } finally {
             setLoading(false);
@@ -287,6 +296,12 @@ const PaymentsPage = () => {
                             {loading ? (
                                 <tr>
                                     <td colSpan="9" className="px-6 py-12 text-center text-gray-500">Loading payments...</td>
+                                </tr>
+                            ) : error ? (
+                                <tr>
+                                    <td colSpan="9" className="px-6 py-12 text-center text-red-600">
+                                        Error: {error}
+                                    </td>
                                 </tr>
                             ) : payments.length === 0 ? (
                                 <tr>

@@ -74,7 +74,7 @@ def get_admin_dashboard():
         # Monthly revenue chart data (keeping this as it's useful for charts if needed, 
         # though user didn't explicitly ask for it to be removed, better to have it)
         cursor.execute("""
-            SELECT DATE_FORMAT(payment_date, '%Y-%m') as month, SUM(amount) as revenue
+            SELECT DATE_FORMAT(payment_date, '%%Y-%%m') as month, SUM(amount) as revenue
             FROM booking_payments
             WHERE payment_status = 'completed'
             GROUP BY month
@@ -1071,7 +1071,7 @@ def get_admin_logs():
         date_to = request.args.get('date_to')
         sort_by = request.args.get('sort_by', 'created_at')
         page = request.args.get('page', 1, type=int)
-        per_page = 20
+        per_page = 15
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -1240,13 +1240,59 @@ def get_admin_analytics():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Test query - just return empty data
+        # Total Stats
+        cursor.execute("""
+            SELECT 
+                COUNT(DISTINCT b.booking_id) as total_bookings,
+                COALESCE(SUM(bp.amount), 0) as total_revenue
+            FROM bookings b
+            LEFT JOIN booking_payments bp ON b.booking_id = bp.booking_id AND bp.payment_status = 'completed'
+        """)
+        total_stats = cursor.fetchone()
+        
+        # Yearly Revenue (Global) - Filtered by Year
+        cursor.execute("""
+            SELECT 
+                DATE_FORMAT(bp.payment_date, '%%Y-%%m') as month,
+                COALESCE(SUM(bp.amount), 0) as revenue
+            FROM booking_payments bp
+            WHERE bp.payment_status = 'completed' AND YEAR(bp.payment_date) = %s
+            GROUP BY month
+            ORDER BY month ASC
+        """, (year,))
+        yearly_revenue = cursor.fetchall()
+        
+        # Bookings by Status (Global)
+        cursor.execute("""
+            SELECT status, COUNT(*) as count
+            FROM bookings
+            GROUP BY status
+        """)
+        bookings_by_status = cursor.fetchall()
+        
+        # Top Performing Venues (Global - by Revenue)
+        cursor.execute("""
+            SELECT v.venue_id, v.name, 
+                   COUNT(b.booking_id) as total_bookings,
+                   COALESCE(SUM(bp.amount), 0) as revenue
+            FROM venues v
+            JOIN bookings b ON v.venue_id = b.venue_id
+            LEFT JOIN booking_payments bp ON b.booking_id = bp.booking_id AND bp.payment_status = 'completed'
+            GROUP BY v.venue_id, v.name
+            ORDER BY revenue DESC
+            LIMIT 5
+        """)
+        top_venues = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        
         return jsonify({
-            'total_revenue': 0,
-            'total_bookings': 0,
-            'yearly': [],
-            'status_breakdown': [],
-            'top_venues': []
+            'total_revenue': float(total_stats['total_revenue']),
+            'total_bookings': total_stats['total_bookings'],
+            'yearly': yearly_revenue,
+            'status_breakdown': bookings_by_status,
+            'top_venues': top_venues
         }), 200
         
     except Exception as e:

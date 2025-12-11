@@ -10,6 +10,7 @@ import bcrypt
 
 from utils.db import get_db_connection
 from utils.decorators import token_required
+from utils.log_utils import log_signup, log_login, log_logout
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -62,6 +63,9 @@ def signup():
         cursor.close()
         conn.close()
         
+        # Log the signup action
+        log_signup(user_id, email, role)
+        
         return jsonify({
             'message': 'User registered successfully',
             'user_id': user_id
@@ -111,6 +115,9 @@ def login():
         cursor.close()
         conn.close()
         
+        # Log successful login
+        log_login(user['user_id'], email, success=True)
+        
         # Generate JWT token
         from flask import current_app
         token = jwt.encode({
@@ -136,6 +143,8 @@ def login():
 
 @auth_bp.route('/logout', methods=['POST'])
 @token_required
-def logout():
+def logout(current_user):
     """User logout"""
+    # Log logout action
+    log_logout(current_user['user_id'], current_user.get('email', 'Unknown'))
     return jsonify({'message': 'Logged out successfully'}), 200

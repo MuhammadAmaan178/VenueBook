@@ -1,8 +1,8 @@
 // components/VenuesTable.jsx
 import React from 'react';
-import { Eye, Edit, Trash2 } from 'lucide-react';
+import { Eye, Edit } from 'lucide-react';
 
-const VenuesTable = ({ venues, onEdit, onDelete, onView }) => {
+const VenuesTable = ({ venues, onEdit, onView }) => {
 
     const columns = [
         "Image", "Venue Name", "Location", "Capacity", "Price", "Status", "Bookings", "Actions"
@@ -77,17 +77,7 @@ const VenuesTable = ({ venues, onEdit, onDelete, onView }) => {
                                         >
                                             <Edit size={18} />
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                onDelete(venue.id);
-                                            }}
-                                            className="p-1 text-gray-600 hover:text-red-600 transition"
-                                            title="Delete Venue"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
+
                                     </div>
                                 </td>
                             </tr>

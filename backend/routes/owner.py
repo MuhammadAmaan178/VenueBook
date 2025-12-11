@@ -8,6 +8,8 @@ from flask import Blueprint, request, jsonify
 
 from utils.db import get_db_connection
 from utils.decorators import token_required, owner_required
+from utils.log_utils import log_venue_action, log_booking_action, log_payment_action
+from utils.notification_utils import notify_booking_status_changed, notify_booking_completed_review_request, notify_payment_received
 
 owner_bp = Blueprint('owner', __name__, url_prefix='/api/owner')
 
@@ -102,6 +104,9 @@ def get_owner_dashboard(owner_id):
 def get_owner_analytics(owner_id):
     """Get owner analytics data"""
     try:
+        # Get optional year parameter for monthly breakdown
+        year = request.args.get('year', type=int)
+        
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -117,7 +122,7 @@ def get_owner_analytics(owner_id):
         """, (owner_id,))
         total_stats = cursor.fetchone()
 
-        # Yearly revenue
+        # Yearly revenue summary
         cursor.execute("""
             SELECT DATE_FORMAT(bp.payment_date, '%%Y') as year,
                    SUM(bp.amount) as revenue
@@ -129,6 +134,23 @@ def get_owner_analytics(owner_id):
             ORDER BY year ASC
         """, (owner_id,))
         yearly_revenue = cursor.fetchall()
+        
+        # Monthly revenue for specific year (if year parameter provided)
+        monthly_revenue = []
+        if year:
+            cursor.execute("""
+                SELECT DATE_FORMAT(bp.payment_date, '%%m') as month,
+                       SUM(bp.amount) as revenue
+                FROM booking_payments bp
+                JOIN bookings b ON bp.booking_id = b.booking_id
+                JOIN venues v ON b.venue_id = v.venue_id
+                WHERE v.owner_id = %s 
+                  AND bp.payment_status = 'completed'
+                  AND YEAR(bp.payment_date) = %s
+                GROUP BY month
+                ORDER BY month ASC
+            """, (owner_id, year))
+            monthly_revenue = cursor.fetchall()
         
         # Bookings by status
         cursor.execute("""
@@ -158,13 +180,20 @@ def get_owner_analytics(owner_id):
         cursor.close()
         conn.close()
         
-        return jsonify({
+        response = {
             'total_revenue': float(total_stats['total_revenue']),
             'total_bookings': total_stats['total_bookings'],
             'yearly': yearly_revenue,
             'status_breakdown': bookings_by_status,
             'top_venues': top_venues
-        }), 200
+        }
+        
+        # Add monthly data if year was specified
+        if year:
+            response['monthly'] = monthly_revenue
+            response['selected_year'] = year
+        
+        return jsonify(response), 200
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -259,6 +288,9 @@ def add_venue(owner_id):
         conn.commit()
         cursor.close()
         conn.close()
+        
+        # Log venue creation
+        log_venue_action(owner_id, 'create', venue_id, f"Created venue '{name}' in {city}")
         
         return jsonify({
             'message': 'Venue added successfully',
@@ -393,6 +425,9 @@ def delete_venue(owner_id, venue_id):
         conn.commit()
         cursor.close()
         conn.close()
+        
+        # Log venue deletion
+        log_venue_action(owner_id, 'delete', venue_id, "Soft deleted venue (set to inactive)")
         
         return jsonify({'message': 'Venue deleted successfully'}), 200
         
@@ -588,18 +623,19 @@ def update_booking_status(owner_id, booking_id):
             WHERE booking_id = %s
         """, (new_status, booking_id))
         
-        # Create notification for customer
-        message = f'Your booking has been {new_status}'
-        cursor.execute("""
-            INSERT INTO notifications 
-            (user_id, title, message, type, booking_id, venue_id, is_read, created_at)
-            VALUES (%s, %s, %s, 'booking', %s, %s, 0, NOW())
-        """, (booking['user_id'], 'Booking Update', message, 
-              booking_id, booking['venue_id']))
-        
         conn.commit()
         cursor.close()
         conn.close()
+        
+        # Log booking status change
+        log_booking_action(owner_id, 'update', booking_id, f"Changed status to {new_status}")
+        
+        # Send notification to customer about status change
+        notify_booking_status_changed(booking_id, new_status)
+        
+        # If status is completed, also send review request notification
+        if new_status == 'completed':
+            notify_booking_completed_review_request(booking_id)
         
         return jsonify({'message': 'Booking status updated successfully'}), 200
         
@@ -667,16 +703,28 @@ def get_owner_payments(owner_id):
         payments = cursor.fetchall()
         
         # Calculate total revenue for filtered results
-        cursor.execute(f"""
+        revenue_query = """
             SELECT COALESCE(SUM(bp.amount), 0) as total_revenue
             FROM booking_payments bp
             JOIN bookings b ON bp.booking_id = b.booking_id
             JOIN venues v ON b.venue_id = v.venue_id
             WHERE v.owner_id = %s AND bp.payment_status = 'completed'
-            {' AND b.venue_id = %s' if venue_id else ''}
-            {' AND bp.payment_date >= %s' if date_start else ''}
-            {' AND bp.payment_date <= %s' if date_end else ''}
-        """, [p for p in params if p is not None])
+        """
+        revenue_params = [owner_id]
+        
+        if venue_id:
+            revenue_query += " AND b.venue_id = %s"
+            revenue_params.append(venue_id)
+        
+        if date_start:
+            revenue_query += " AND bp.payment_date >= %s"
+            revenue_params.append(date_start)
+        
+        if date_end:
+            revenue_query += " AND bp.payment_date <= %s"
+            revenue_params.append(date_end)
+        
+        cursor.execute(revenue_query, revenue_params)
         
         total_revenue = cursor.fetchone()['total_revenue']
         

@@ -5,7 +5,7 @@ import Header from './Header';
 import StatsCards from './StatsCards';
 import { useAuth } from '../../contexts/AuthContext';
 import { ownerService } from '../../services/api';
-import { Eye, Edit, Trash2, Check } from 'lucide-react';
+import { Eye, Edit, Check } from 'lucide-react';
 import VenueDetailsModal from './modals/VenueDetailsModal';
 import EditVenueModal from './modals/EditVenueModal';
 import BookingDetailsModal from './modals/BookingDetailsModal';
@@ -102,24 +102,7 @@ const Dashboard = () => {
     }
   };
 
-  const handleDeleteVenue = async (venueId, venueName) => {
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${venueName}"?\n\nThis action cannot be undone.`
-    );
 
-    if (!confirmed) return;
-
-    try {
-      const token = localStorage.getItem('token');
-      const ownerId = user.owner_id || user.user_id;
-      await ownerService.deleteVenue(ownerId, venueId, token);
-      alert('Venue deleted successfully!');
-      fetchDashboard(); // Refresh data
-    } catch (error) {
-      console.error('Error deleting venue:', error);
-      alert(error.message || 'Failed to delete venue');
-    }
-  };
 
   // Booking Actions
   const handleViewBooking = async (bookingId) => {
@@ -217,13 +200,7 @@ const Dashboard = () => {
                             >
                               <Edit size={18} className="text-green-600" />
                             </button>
-                            <button
-                              onClick={() => handleDeleteVenue(venue.venue_id, venue.name)}
-                              className="p-2 hover:bg-red-100 rounded-lg transition"
-                              title="Delete Venue"
-                            >
-                              <Trash2 size={18} className="text-red-600" />
-                            </button>
+
                           </div>
                         </td>
                       </tr>

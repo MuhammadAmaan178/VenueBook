@@ -210,8 +210,11 @@ export const ownerService = {
     return handleResponse(response);
   },
 
-  getAnalytics: async (ownerId, token) => {
-    const response = await fetch(`${API_BASE_URL}/api/owner/${ownerId}/analytics`, {
+  getAnalytics: async (ownerId, token, year = null) => {
+    const url = year
+      ? `${API_BASE_URL}/api/owner/${ownerId}/analytics?year=${year}`
+      : `${API_BASE_URL}/api/owner/${ownerId}/analytics`;
+    const response = await fetch(url, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     return handleResponse(response);
