@@ -6,6 +6,9 @@ Handles venue browsing and venue details for public users.
 from flask import Blueprint, request, jsonify
 
 from utils.db import get_db_connection
+from utils.decorators import token_required
+from utils.log_utils import log_review_action
+from utils.notification_utils import notify_new_review
 
 venues_bp = Blueprint('venues', __name__, url_prefix='/api/venues')
 
@@ -114,9 +117,10 @@ def get_venue_details(venue_id):
         
         # Get venue details
         cursor.execute("""
-            SELECT v.*, o.business_name as owner_name
+            SELECT v.*, o.business_name as owner_name, u.phone as owner_phone, u.user_id as owner_user_id
             FROM venues v
             LEFT JOIN owners o ON v.owner_id = o.owner_id
+            LEFT JOIN users u ON o.user_id = u.user_id
             WHERE v.venue_id = %s
         """, (venue_id,))
         venue = cursor.fetchone()
@@ -139,11 +143,11 @@ def get_venue_details(venue_id):
         
         # Get reviews
         cursor.execute("""
-            SELECT br.*, u.name as user_name
-            FROM booking_reviews br
-            JOIN users u ON br.user_id = u.user_id
-            WHERE br.venue_id = %s
-            ORDER BY br.review_date DESC
+            SELECT vr.*, u.name as user_name
+            FROM venue_reviews vr
+            JOIN users u ON vr.user_id = u.user_id
+            WHERE vr.venue_id = %s
+            ORDER BY vr.review_date DESC
             LIMIT 10
         """, (venue_id,))
         venue['reviews'] = cursor.fetchall()
@@ -211,6 +215,165 @@ def get_booking_data(venue_id):
             'facilities': facilities,
             'availability': availability,
             'payment_info': payment_info
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@venues_bp.route('/reviews/recent', methods=['GET'])
+def get_recent_reviews():
+    """Get recent high-rated reviews for homepage testimonials"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Fetch 3 most recent reviews with rating >= 4
+        cursor.execute("""
+            SELECT 
+                vr.review_text, 
+                vr.rating, 
+                vr.review_date,
+                u.name as customer_name,
+                v.name as venue_name
+            FROM venue_reviews vr
+            JOIN users u ON vr.user_id = u.user_id
+            JOIN venues v ON vr.venue_id = v.venue_id
+            WHERE vr.rating >= 4 
+                AND vr.review_text IS NOT NULL 
+                AND vr.review_text != ''
+            ORDER BY vr.review_date DESC
+            LIMIT 3
+        """)
+        reviews = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            'reviews': reviews,
+            'count': len(reviews)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@venues_bp.route('/<int:venue_id>/reviews', methods=['POST'])
+@token_required
+def create_review(venue_id):
+    """Submit a review for a venue"""
+    try:
+        data = request.json
+        rating = data.get('rating')
+        review_text = data.get('review_text', '')
+        
+        if not rating or rating < 1 or rating > 5:
+            return jsonify({'error': 'Invalid rating'}), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Check if venue exists
+        cursor.execute("SELECT venue_id FROM venues WHERE venue_id = %s", (venue_id,))
+        if not cursor.fetchone():
+            return jsonify({'error': 'Venue not found'}), 404
+        
+        # Insert review
+        cursor.execute("""
+            INSERT INTO venue_reviews 
+            (user_id, venue_id, rating, review_text, review_date)
+            VALUES (%s, %s, %s, %s, NOW())
+        """, (request.user_id, venue_id, rating, review_text))
+        
+        # Update venue rating
+        cursor.execute("""
+            UPDATE venues 
+            SET rating = (
+                SELECT AVG(rating) 
+                FROM venue_reviews 
+                WHERE venue_id = %s
+            )
+            WHERE venue_id = %s
+        """, (venue_id, venue_id))
+        
+        conn.commit()
+        review_id = cursor.lastrowid
+        cursor.close()
+        conn.close()
+        
+        # Log and notify
+        log_review_action(request.user_id, 'create', review_id, f"Submitted {rating}-star review for venue #{venue_id}")
+        notify_new_review(venue_id, rating)
+        
+        return jsonify({
+            'message': 'Review submitted successfully',
+            'review_id': review_id
+        }), 201
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@venues_bp.route('/stats/public', methods=['GET'])
+def get_public_stats():
+    """Get public statistics for homepage"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get total venues
+        cursor.execute("SELECT COUNT(*) as total FROM venues WHERE status = 'active'")
+        total_venues = cursor.fetchone()['total']
+        
+        # Get total users
+        cursor.execute("SELECT COUNT(*) as total FROM users WHERE role = 'user'")
+        total_users = cursor.fetchone()['total']
+        
+        # Get total owners
+        cursor.execute("SELECT COUNT(*) as total FROM owners")
+        total_owners = cursor.fetchone()['total']
+        
+        # Get average rating
+        cursor.execute("SELECT AVG(rating) as avg_rating FROM venues WHERE rating IS NOT NULL")
+        result = cursor.fetchone()
+        avg_rating = round(result['avg_rating'], 1) if result['avg_rating'] else 0.0
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            'total_venues': total_venues,
+            'total_users': total_users,
+            'total_owners': total_owners,
+            'average_rating': avg_rating
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@venues_bp.route('/filters', methods=['GET'])
+def get_filters():
+    """Get dynamic filter options for search"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get distinct cities
+        cursor.execute("SELECT DISTINCT city FROM venues WHERE status = 'active' ORDER BY city")
+        cities = [row['city'] for row in cursor.fetchall() if row['city']]
+        
+        # Get distinct types
+        cursor.execute("SELECT DISTINCT type FROM venues WHERE status = 'active' ORDER BY type")
+        types = [row['type'] for row in cursor.fetchall() if row['type']]
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            'cities': cities,
+            'types': types
         }), 200
         
     except Exception as e:

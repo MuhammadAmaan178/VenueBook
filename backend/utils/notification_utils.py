@@ -4,8 +4,9 @@ Notification utility functions for VenueBook
 Provides centralized notification creation and management
 """
 
-from config import get_db_connection
+from utils.db import get_db_connection
 from datetime import datetime
+from extensions import socketio
 
 def create_notification(user_id, title, message, notification_type='system', booking_id=None, venue_id=None):
     """
@@ -27,9 +28,13 @@ def create_notification(user_id, title, message, notification_type='system', boo
         cursor = conn.cursor()
         
         query = """
-            INSERT INTO notifications (user_id, title, message, type, booking_id, venue_id)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            INSERT INTO notifications (user_id, title, message, type, booking_id, venue_id, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
         """
+        
+        # Note: Added NOW() explicit insert to match retrieval if needed, 
+        # though DB usually handles default CURRENT_TIMESTAMP.
+        # But for socket emission we need the time.
         
         cursor.execute(query, (user_id, title, message, notification_type, booking_id, venue_id))
         conn.commit()
@@ -38,6 +43,32 @@ def create_notification(user_id, title, message, notification_type='system', boo
         
         cursor.close()
         conn.close()
+        
+        # Emit Real-time Notification
+        try:
+            notification_data = {
+                'notification_id': notification_id, # Frontend expects id or notification_id? Checked Navbar, it uses .id in some places but .notification_id in API? 
+                # Navbar.jsx uses: n.id in handleMarkRead(n.id) BUT API returns notification_id.
+                # Let's check api.js or Navbar map.
+                # Navbar map: key={n.id}.
+                # Let's provide both to be safe or check existing API response.
+                'id': notification_id, 
+                'notification_id': notification_id,
+                'title': title,
+                'message': message,
+                'type': notification_type,
+                'booking_id': booking_id,
+                'venue_id': venue_id,
+                'is_read': 0,
+                'created_at': datetime.now().isoformat()
+            }
+            
+            # Emit to user's private room
+            socketio.emit('new_notification', notification_data, room=f"user_{user_id}")
+            print(f"Emitted notification to user_{user_id}")
+            
+        except Exception as socket_error:
+            print(f"Socket emit failed: {str(socket_error)}")
         
         return notification_id
         
@@ -320,4 +351,69 @@ def notify_new_review(venue_id, rating):
     
     except Exception as e:
         print(f"Error notifying new review: {str(e)}")
+        return None
+
+
+def notify_admins_new_venue(venue_id):
+    """
+    Notify all admins when a new venue is submitted for approval
+    
+    Args:
+        venue_id (int): Venue ID
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        
+        # Get venue and owner details
+        query = """
+            SELECT v.venue_id, v.venue_name, v.city, v.type,
+                   u.user_id as owner_id, u.fullname as owner_name
+            FROM venues v
+            JOIN users u ON v.owner_id = u.user_id
+            WHERE v.venue_id = %s
+        """
+        
+        cursor.execute(query, (venue_id,))
+        venue = cursor.fetchone()
+        
+        if not venue:
+            cursor.close()
+            conn.close()
+            return None
+        
+        # Get all admin users
+        cursor.execute("""
+            SELECT user_id, fullname
+            FROM users
+            WHERE role = 'admin'
+        """)
+        admins = cursor.fetchall()
+        
+        cursor.close()
+        conn.close()
+        
+        if admins:
+            title = "New Venue Pending Approval"
+            message = f"New {venue['type']} venue '{venue['venue_name']}' in {venue['city']} submitted by {venue['owner_name']} awaits your review"
+            
+            # Create notification for each admin
+            notification_ids = []
+            for admin in admins:
+                notif_id = create_notification(
+                    user_id=admin['user_id'],
+                    title=title,
+                    message=message,
+                    notification_type='verification',
+                    venue_id=venue_id
+                )
+                if notif_id:
+                    notification_ids.append(notif_id)
+            
+            return notification_ids
+        
+        return None
+    
+    except Exception as e:
+        print(f"Error notifying admins of new venue: {str(e)}")
         return None

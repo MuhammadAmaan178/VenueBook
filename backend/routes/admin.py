@@ -228,7 +228,13 @@ def get_admin_user_details(user_id):
         total_spent = cursor.fetchone()['total_spent']
         
         # Reviews given
-        cursor.execute("SELECT * FROM booking_reviews WHERE user_id = %s", (user_id,))
+        cursor.execute("""
+            SELECT vr.*, v.name as venue_name
+            FROM venue_reviews vr
+            JOIN venues v ON vr.venue_id = v.venue_id
+            WHERE vr.user_id = %s
+            ORDER BY vr.review_date DESC
+        """, (user_id,))
         reviews = cursor.fetchall()
         
         cursor.close()
@@ -623,11 +629,11 @@ def get_admin_venue_details(venue_id):
         
         # Reviews
         cursor.execute("""
-            SELECT br.*, u.name as customer_name
-            FROM booking_reviews br
-            JOIN users u ON br.user_id = u.user_id
-            WHERE br.venue_id = %s
-            ORDER BY br.review_date DESC
+            SELECT vr.*, u.name as customer_name
+            FROM venue_reviews vr
+            JOIN users u ON vr.user_id = u.user_id
+            WHERE vr.venue_id = %s
+            ORDER BY vr.review_date DESC
         """, (venue_id,))
         venue['reviews'] = cursor.fetchall()
         
@@ -869,8 +875,8 @@ def get_admin_booking_details(booking_id):
                    bcd.phone_primary, bcd.phone_secondary
             FROM bookings b
             JOIN venues v ON b.venue_id = v.venue_id
-            JOIN owners o ON v.owner_id = o.owner_id
-            JOIN users u ON o.user_id = u.user_id
+            LEFT JOIN owners o ON v.owner_id = o.owner_id
+            LEFT JOIN users u ON o.user_id = u.user_id
             LEFT JOIN booking_customer_details bcd ON b.booking_id = bcd.booking_id
             WHERE b.booking_id = %s
         """, (booking_id,))
@@ -892,17 +898,17 @@ def get_admin_booking_details(booking_id):
         cursor.execute("SELECT * FROM booking_payments WHERE booking_id = %s", (booking_id,))
         booking['payment'] = cursor.fetchone()
         
-        # Review
-        cursor.execute("SELECT * FROM booking_reviews WHERE booking_id = %s", (booking_id,))
-        booking['review'] = cursor.fetchone()
+
         
         # Timeline/Logs (mocked or fetched from logs if available)
-        # Assuming logs table exists as per plan
+        # Timeline/Logs
+        # Search in details since record_id column doesn't exist
+        search_pattern = f"Booking #{booking_id}:%"
         cursor.execute("""
             SELECT * FROM logs 
-            WHERE target_table = 'bookings' AND record_id = %s
+            WHERE target_table = 'bookings' AND details LIKE %s
             ORDER BY created_at DESC
-        """, (booking_id,))
+        """, (search_pattern,))
         booking['timeline'] = cursor.fetchall()
         
         cursor.close()
@@ -1163,21 +1169,21 @@ def get_admin_reviews():
         cursor = conn.cursor()
         
         query = """
-            SELECT br.*, v.name as venue_name, v.city as venue_city,
+            SELECT vr.*, v.name as venue_name, v.city as venue_city,
                    u.name as customer_name, u.email as customer_email
-            FROM booking_reviews br
-            JOIN venues v ON br.venue_id = v.venue_id
-            JOIN users u ON br.user_id = u.user_id
+            FROM venue_reviews vr
+            JOIN venues v ON vr.venue_id = v.venue_id
+            JOIN users u ON vr.user_id = u.user_id
             WHERE 1=1
         """
         params = []
         
         if venue_id:
-            query += " AND br.venue_id = %s"
+            query += " AND vr.venue_id = %s"
             params.append(venue_id)
             
         if rating_min:
-            query += " AND br.rating >= %s"
+            query += " AND vr.rating >= %s"
             params.append(rating_min)
             
         if search:
@@ -1185,11 +1191,11 @@ def get_admin_reviews():
             params.extend([f'%{search}%', f'%{search}%'])
         
         if date_from:
-            query += " AND br.review_date >= %s"
+            query += " AND vr.review_date >= %s"
             params.append(date_from)
             
         if date_to:
-            query += " AND br.review_date <= %s"
+            query += " AND vr.review_date <= %s"
             params.append(date_to)
 
         # Count total
@@ -1202,7 +1208,7 @@ def get_admin_reviews():
         if sort_by not in ['review_date', 'rating']:
             sort_by = 'review_date'
             
-        query += f" ORDER BY br.{sort_by} DESC"
+        query += f" ORDER BY vr.{sort_by} DESC"
         
         # Pagination
         offset = (page - 1) * per_page

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { Rocket, Shield, Key, Database, Zap, Sparkles, Folder, Terminal } from 'lucide-react';
+import { API_BASE_URL } from '../../services/api';
 import styled, { keyframes } from 'styled-components';
 
 const float = keyframes`
@@ -123,7 +125,7 @@ const AntigravityPanel = () => {
     const fetchData = async () => {
       try {
         // Assuming the backend is running on port 5000
-        const response = await fetch('http://localhost:5000/api/antigravity/data');
+        const response = await fetch(`${API_BASE_URL}/api/antigravity/data`);
         if (!response.ok) {
           throw new Error('Network response was not ok');
         }
@@ -144,7 +146,7 @@ const AntigravityPanel = () => {
     <Container>
       <Content>
         <Title>Antigravity Control</Title>
-        
+
         {loading && (
           <div>
             <StatusMessage>Initiating Antigravity Sequence...</StatusMessage>

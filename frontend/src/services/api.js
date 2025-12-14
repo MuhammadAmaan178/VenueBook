@@ -1,5 +1,5 @@
 // src/services/api.js
-const API_BASE_URL = 'http://localhost:5000';
+export const API_BASE_URL = 'http://localhost:5000';
 
 const handleResponse = async (response) => {
   if (!response.ok) {
@@ -143,6 +143,22 @@ export const venueService = {
     const response = await fetch(`${API_BASE_URL}/api/venues/${venueId}/booking-data?${queryParams}`);
     return handleResponse(response);
   },
+
+  getFilters: async () => {
+    const response = await fetch(`${API_BASE_URL}/api/venues/filters`);
+    return handleResponse(response);
+  },
+  submitReview: async (venueId, reviewData, token) => {
+    const response = await fetch(`${API_BASE_URL}/api/venues/${venueId}/reviews`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(reviewData),
+    });
+    return handleResponse(response);
+  },
 };
 
 export const bookingService = {
@@ -154,18 +170,6 @@ export const bookingService = {
         'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify(bookingData),
-    });
-    return handleResponse(response);
-  },
-
-  submitReview: async (bookingId, reviewData, token) => {
-    const response = await fetch(`${API_BASE_URL}/api/bookings/${bookingId}/review`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-      body: JSON.stringify(reviewData),
     });
     return handleResponse(response);
   },
@@ -195,6 +199,13 @@ export const userService = {
     const queryParams = new URLSearchParams(filters).toString();
     const url = `${API_BASE_URL}/api/users/${userId}/bookings${queryParams ? `?${queryParams}` : ''}`;
     const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return handleResponse(response);
+  },
+
+  getBookingDetails: async (userId, bookingId, token) => {
+    const response = await fetch(`${API_BASE_URL}/api/users/${userId}/bookings/${bookingId}`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     return handleResponse(response);
@@ -305,6 +316,13 @@ export const ownerService = {
     return handleResponse(response);
   },
 
+  getPaymentDetails: async (ownerId, paymentId, token) => {
+    const response = await fetch(`${API_BASE_URL}/api/owner/${ownerId}/payments/${paymentId}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return handleResponse(response);
+  },
+
   getReviews: async (ownerId, filters = {}, token) => {
     const queryParams = new URLSearchParams(filters).toString();
     const url = `${API_BASE_URL}/api/owner/${ownerId}/reviews${queryParams ? `?${queryParams}` : ''}`;
@@ -393,10 +411,24 @@ export const adminService = {
     return handleResponse(response);
   },
 
+  getBookingDetails: async (bookingId, token) => {
+    const response = await fetch(`${API_BASE_URL}/api/admin/bookings/${bookingId}`, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return handleResponse(response);
+  },
+
   getPayments: async (filters = {}, token) => {
     const queryParams = new URLSearchParams(filters).toString();
     const url = `${API_BASE_URL}/api/admin/payments${queryParams ? `?${queryParams}` : ''}`;
     const response = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return handleResponse(response);
+  },
+
+  getPaymentDetails: async (paymentId, token) => {
+    const response = await fetch(`${API_BASE_URL}/api/admin/payments/${paymentId}`, {
       headers: { 'Authorization': `Bearer ${token}` },
     });
     return handleResponse(response);
@@ -454,3 +486,13 @@ export const notificationService = {
     return handleResponse(response);
   },
 };
+
+// Default export for generic API calls
+const api = {
+  get: async (endpoint) => {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`);
+    return handleResponse(response);
+  },
+};
+
+export default api;

@@ -140,21 +140,25 @@ const VenueBookingForm = () => {
     const steps = ['Booking', 'Contact', 'Services', 'Payment', 'Summary'];
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 p-4 md:p-6">
-            <div className="max-w-4xl mx-auto">
+        <div className="min-h-screen bg-gray-50 relative overflow-hidden">
+            {/* Background Blobs */}
+            <div className="absolute top-0 right-0 -mt-20 -mr-20 w-[800px] h-[800px] bg-blue-50/40 rounded-full blur-3xl pointer-events-none z-0"></div>
+            <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-[600px] h-[600px] bg-purple-50/40 rounded-full blur-3xl pointer-events-none z-0"></div>
+
+            <div className="relative z-10 p-4 md:p-8 pt-24 max-w-5xl mx-auto">
                 {/* Success Message Modal */}
                 {showSuccess && (
-                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-lg p-8 max-w-md w-full text-center">
-                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                                <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-300">
+                        <div className="bg-white rounded-3xl p-10 max-w-md w-full text-center shadow-2xl transform scale-100 animate-in zoom-in-95 duration-300">
+                            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
+                                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                                 </svg>
                             </div>
-                            <h2 className="text-2xl font-bold text-gray-800 mb-2">Booking Successful!</h2>
-                            <p className="text-gray-600 mb-6">
-                                Your booking for {venue ? venue.name : 'Venue'} has been confirmed.
-                                A confirmation email has been sent to {formData.email}.
+                            <h2 className="text-3xl font-bold text-gray-900 mb-3">Booking Confirmed!</h2>
+                            <p className="text-gray-600 mb-8 text-lg">
+                                Your booking for {venue ? venue.name : 'Venue'} has been secured.
+                                <br />A confirmation email has been sent to <span className="font-semibold text-gray-900">{formData.email}</span>.
                             </p>
                         </div>
                     </div>
@@ -163,90 +167,110 @@ const VenueBookingForm = () => {
                 {/* Back Button */}
                 <button
                     onClick={() => navigate('/venues')}
-                    className="mb-6 text-blue-600 hover:text-blue-800 font-medium flex items-center transition-colors"
+                    className="mb-8 flex items-center gap-2 text-gray-500 hover:text-blue-600 transition-colors font-medium group"
                 >
-                    <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
+                    <div className="p-2 bg-white rounded-full shadow-sm group-hover:shadow-md transition-all">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                        </svg>
+                    </div>
                     Back to Venues
                 </button>
 
-                {/* Progress Bar */}
-                <div className="mb-8">
-                    <div className="flex items-center justify-between mb-4">
-                        {steps.map((step, index) => (
-                            <React.Fragment key={step}>
-                                <div className="flex items-center">
-                                    <div className={`w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center font-semibold text-sm md:text-base ${currentStep > index + 1
-                                        ? 'bg-green-500 text-white'
-                                        : currentStep === index + 1
-                                            ? 'bg-blue-600 text-white'
-                                            : 'bg-gray-300 text-gray-700'
-                                        }`}>
-                                        {index + 1}
+                {/* Progress Bar - Modern */}
+                <div className="mb-12">
+                    <div className="flex items-center justify-between relative">
+                        {/* Connecting Line */}
+                        <div className="absolute left-0 top-1/2 transform -translate-y-1/2 w-full h-1 bg-gray-200 rounded-full -z-10"></div>
+                        <div
+                            className="absolute left-0 top-1/2 transform -translate-y-1/2 h-1 bg-blue-600 rounded-full -z-10 transition-all duration-500 ease-in-out"
+                            style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
+                        ></div>
+
+                        {steps.map((step, index) => {
+                            const isCompleted = currentStep > index + 1;
+                            const isCurrent = currentStep === index + 1;
+
+                            return (
+                                <div key={step} className="flex flex-col items-center">
+                                    <div
+                                        className={`
+                                            w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-bold text-sm md:text-base transition-all duration-300 border-4
+                                            ${isCompleted
+                                                ? 'bg-blue-600 border-blue-600 text-white shadow-lg shadow-blue-200'
+                                                : isCurrent
+                                                    ? 'bg-white border-blue-600 text-blue-600 shadow-lg scale-110'
+                                                    : 'bg-white border-gray-200 text-gray-400'
+                                            }
+                                        `}
+                                    >
+                                        {isCompleted ? (
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                                            </svg>
+                                        ) : index + 1}
                                     </div>
-                                    <span className={`ml-2 font-medium text-sm md:text-base ${currentStep >= index + 1 ? 'text-gray-800' : 'text-gray-500'
-                                        }`}>
+                                    <span
+                                        className={`
+                                            mt-3 font-semibold text-xs md:text-sm tracking-wide transition-colors duration-300
+                                            ${isCurrent ? 'text-blue-900' : isCompleted ? 'text-blue-600' : 'text-gray-400'}
+                                        `}
+                                    >
                                         {step}
                                     </span>
                                 </div>
-                                {index < steps.length - 1 && (
-                                    <div className={`flex-1 h-1 mx-2 md:mx-4 ${currentStep > index + 1 ? 'bg-green-500' : 'bg-gray-300'
-                                        }`} />
-                                )}
-                            </React.Fragment>
-                        ))}
-                    </div>
-                    <div className="text-center text-sm text-gray-600">
-                        Step {currentStep} of 5
+                            );
+                        })}
                     </div>
                 </div>
 
                 {/* Render Current Step */}
-                {currentStep === 1 && (
-                    <BookingInformation
-                        data={formData}
-                        onUpdate={handleUpdateFormData}
-                        onNext={handleNext}
-                        venue={venue}
-                    />
-                )}
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {currentStep === 1 && (
+                        <BookingInformation
+                            data={formData}
+                            onUpdate={handleUpdateFormData}
+                            onNext={handleNext}
+                            venue={venue}
+                        />
+                    )}
 
-                {currentStep === 2 && (
-                    <ContactInformation
-                        data={formData}
-                        onUpdate={handleUpdateFormData}
-                        onNext={handleNext}
-                        onBack={handleBack}
-                    />
-                )}
+                    {currentStep === 2 && (
+                        <ContactInformation
+                            data={formData}
+                            onUpdate={handleUpdateFormData}
+                            onNext={handleNext}
+                            onBack={handleBack}
+                        />
+                    )}
 
-                {currentStep === 3 && (
-                    <AdditionalServices
-                        data={formData}
-                        onUpdate={handleUpdateFormData}
-                        onNext={handleNext}
-                        onBack={handleBack}
-                    />
-                )}
+                    {currentStep === 3 && (
+                        <AdditionalServices
+                            data={formData}
+                            onUpdate={handleUpdateFormData}
+                            onNext={handleNext}
+                            onBack={handleBack}
+                        />
+                    )}
 
-                {currentStep === 4 && (
-                    <PaymentMethod
-                        data={formData}
-                        onUpdate={handleUpdateFormData}
-                        onNext={handleNext}
-                        onBack={handleBack}
-                    />
-                )}
+                    {currentStep === 4 && (
+                        <PaymentMethod
+                            data={formData}
+                            onUpdate={handleUpdateFormData}
+                            onNext={handleNext}
+                            onBack={handleBack}
+                        />
+                    )}
 
-                {currentStep === 5 && (
-                    <BookingSummary
-                        data={formData}
-                        onSubmit={handleSubmitBooking}
-                        onBack={handleBack}
-                        venue={venue}
-                    />
-                )}
+                    {currentStep === 5 && (
+                        <BookingSummary
+                            data={formData}
+                            onSubmit={handleSubmitBooking}
+                            onBack={handleBack}
+                            venue={venue}
+                        />
+                    )}
+                </div>
             </div>
         </div>
     );

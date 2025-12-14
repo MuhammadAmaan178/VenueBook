@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PhoneInput from '../common/PhoneInput';
 
 // Component 1: Booking Information
 const BookingInformation = ({ data, onUpdate, onNext }) => {
@@ -160,33 +161,20 @@ const ContactInformation = ({ data, onUpdate, onNext, onBack }) => {
         </div>
 
         {/* Phone Number */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Phone Number *
-          </label>
-          <input
-            type="tel"
-            value={data.phoneNumber || ''}
-            onChange={(e) => handleChange('phoneNumber', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            placeholder="Enter Your Phone Number"
-            required
-          />
-        </div>
+        <PhoneInput
+          value={data.phoneNumber || ''}
+          onChange={(e) => handleChange('phoneNumber', e.target.value)}
+          required
+          label="Phone Number *"
+        />
 
         {/* Alternative Phone Number */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Alternative Phone Number
-          </label>
-          <input
-            type="tel"
-            value={data.alternativePhone || ''}
-            onChange={(e) => handleChange('alternativePhone', e.target.value)}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            placeholder="Enter Your Second Phone Number"
-          />
-        </div>
+        <PhoneInput
+          value={data.alternativePhone || ''}
+          onChange={(e) => handleChange('alternativePhone', e.target.value)}
+          label="Alternative Phone Number"
+          placeholder="Enter Your Second Phone Number"
+        />
 
         {/* Special Requirements */}
         <div>
@@ -715,7 +703,7 @@ const EventBookingForm = () => {
 
   const handleSubmitBooking = () => {
     // In real app, you would send this data to your backend
-    console.log('Booking submitted:', formData);
+    ('Booking submitted:', formData);
 
     // Show success message
     setShowSuccess(true);

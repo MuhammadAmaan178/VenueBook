@@ -7,8 +7,9 @@ from flask import Blueprint, request, jsonify
 
 from utils.db import get_db_connection
 from utils.decorators import token_required
-from utils.log_utils import log_booking_action, log_review_action
-from utils.notification_utils import notify_booking_created, notify_new_review
+from utils.log_utils import log_booking_action
+from utils.notification_utils import notify_booking_created
+from utils.phone_validation import validate_phone_format
 
 bookings_bp = Blueprint('bookings', __name__, url_prefix='/api/bookings')
 
@@ -31,6 +32,17 @@ def create_booking():
         email = data.get('email')
         phone_primary = data.get('phone_primary')
         phone_secondary = data.get('phone_secondary')
+
+        # Validate phones
+        if phone_primary:
+            is_valid, error = validate_phone_format(phone_primary)
+            if not is_valid:
+                return jsonify({'error': f"Primary Phone: {error}"}), 400
+        
+        if phone_secondary:
+            is_valid, error = validate_phone_format(phone_secondary)
+            if not is_valid:
+                return jsonify({'error': f"Secondary Phone: {error}"}), 400
         
         # Facilities
         facility_ids = data.get('facility_ids', [])
@@ -109,6 +121,7 @@ def create_booking():
         cursor.close()
         conn.close()
         
+
         # Log booking creation
         log_booking_action(request.user_id, 'create', booking_id, f"Created {event_type} booking for venue #{venue_id}")
         
@@ -119,82 +132,6 @@ def create_booking():
             'message': 'Booking created successfully',
             'booking_id': booking_id
         }), 201
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@bookings_bp.route('/<int:booking_id>/review', methods=['POST'])
-@token_required
-def submit_review(booking_id):
-    """Submit review for completed booking"""
-    try:
-        data = request.json
-        rating = data.get('rating')
-        review_text = data.get('review_text', '')
-        
-        if not rating or rating < 1 or rating > 5:
-            return jsonify({'error': 'Invalid rating'}), 400
-        
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        # Check if booking exists and is completed
-        cursor.execute("""
-            SELECT venue_id, user_id, status 
-            FROM bookings 
-            WHERE booking_id = %s
-        """, (booking_id,))
-        booking = cursor.fetchone()
-        
-        if not booking:
-            return jsonify({'error': 'Booking not found'}), 404
-        
-        if booking['user_id'] != request.user_id:
-            return jsonify({'error': 'Unauthorized'}), 403
-        
-        if booking['status'] != 'completed':
-            return jsonify({'error': 'Can only review completed bookings'}), 400
-        
-        # Check if review already exists
-        cursor.execute("""
-            SELECT review_id FROM booking_reviews 
-            WHERE booking_id = %s
-        """, (booking_id,))
-        if cursor.fetchone():
-            return jsonify({'error': 'Review already submitted'}), 400
-        
-        # Insert review
-        cursor.execute("""
-            INSERT INTO booking_reviews 
-            (booking_id, user_id, venue_id, rating, review_text, review_date)
-            VALUES (%s, %s, %s, %s, %s, NOW())
-        """, (booking_id, request.user_id, booking['venue_id'], rating, review_text))
-        
-        # Update venue rating
-        cursor.execute("""
-            UPDATE venues 
-            SET rating = (
-                SELECT AVG(rating) 
-                FROM booking_reviews 
-                WHERE venue_id = %s
-            )
-            WHERE venue_id = %s
-        """, (booking['venue_id'], booking['venue_id']))
-        
-        conn.commit()
-        cursor.close()
-        conn.close()
-        
-        review_id = cursor.lastrowid
-        
-        # Log review submission
-        log_review_action(request.user_id, 'create', review_id, f"Submitted {rating}-star review for booking #{booking_id}")
-        
-        # Notify owner of new review
-        notify_new_review(booking['venue_id'], rating)
-        
-        return jsonify({'message': 'Review submitted successfully'}), 201
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500

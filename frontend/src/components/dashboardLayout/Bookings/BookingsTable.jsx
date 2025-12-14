@@ -114,9 +114,7 @@ const BookingsTable = ({ bookings, onViewDetails, onApprove, onReject, onUpdateS
                                 {/* Date */}
                                 <td className="py-4 px-6">
                                     <div className="font-medium text-gray-800">{booking.date}</div>
-                                    <div className="text-sm text-gray-500">
-                                        {booking.guests} guests
-                                    </div>
+
                                 </td>
 
                                 {/* Amount */}

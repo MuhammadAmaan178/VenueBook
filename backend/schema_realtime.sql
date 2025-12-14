@@ -1,6 +1,32 @@
 -- VenueBook Real-time System Tables
 -- Tables for logging, notifications, and reviews
 
+-- Conversations Table
+CREATE TABLE IF NOT EXISTS conversations (
+    conversation_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,  -- Customer
+    owner_id INT NOT NULL, -- Owner
+    venue_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_message_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (owner_id) REFERENCES owners(owner_id) ON DELETE CASCADE,
+    FOREIGN KEY (venue_id) REFERENCES venues(venue_id) ON DELETE CASCADE,
+    UNIQUE KEY unique_conversation (user_id, owner_id, venue_id)
+);
+
+-- Messages Table
+CREATE TABLE IF NOT EXISTS messages (
+    message_id INT AUTO_INCREMENT PRIMARY KEY,
+    conversation_id INT NOT NULL,
+    sender_id INT NOT NULL,
+    content TEXT NOT NULL,
+    is_read TINYINT(1) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (conversation_id) REFERENCES conversations(conversation_id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(user_id) ON DELETE CASCADE
+);
+
 -- Logs Table
 CREATE TABLE IF NOT EXISTS logs (
     log_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -28,17 +54,17 @@ CREATE TABLE IF NOT EXISTS notifications (
     FOREIGN KEY (venue_id) REFERENCES venues(venue_id) ON DELETE CASCADE
 );
 
--- Booking Reviews Table
-CREATE TABLE IF NOT EXISTS booking_reviews (
+-- Venue Reviews Table (Renamed from Booking Reviews)
+CREATE TABLE IF NOT EXISTS venue_reviews (
     review_id INT AUTO_INCREMENT PRIMARY KEY,
-    booking_id INT NOT NULL,
     user_id INT NOT NULL,
-    rating INT NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    venue_id INT NOT NULL,
+    rating INT CHECK (rating BETWEEN 1 AND 5),
     review_text TEXT,
-    notes_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (booking_id) REFERENCES bookings(booking_id) ON DELETE CASCADE,
+    review_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    UNIQUE KEY unique_booking_review (booking_id, user_id)
+    FOREIGN KEY (venue_id) REFERENCES venues(venue_id) ON DELETE CASCADE
 );
 
 -- Indexes for better performance

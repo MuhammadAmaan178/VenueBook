@@ -1,7 +1,40 @@
 // components/AddVenueForm.jsx
 import React, { useState } from 'react';
-import { X, Upload, ArrowLeft, ArrowRight, Save, AlertCircle } from 'lucide-react';
-import { useAuth } from '../../../contexts/AuthContext'; // Import useAuth if available, or assume passed prop
+import { Crown, MapPin, DollarSign, Users, Building, Image as ImageIcon, Plus, X, Loader, Upload, ArrowLeft, ArrowRight, Save, AlertCircle, Check, Grid, Briefcase, Calendar } from 'lucide-react';
+import { API_BASE_URL } from '../../../services/api';
+import { useAuth } from '../../../contexts/AuthContext';
+import AvailabilityCalendar from '../../common/AvailabilityCalendar';
+import PhoneInput from '../../common/PhoneInput';
+
+const venueTypes = [
+    'Banquet Hall', 'Garden', 'Hotel', 'Convention Center',
+    'Farmhouse', 'Marquee', 'Resort', 'Other'
+];
+
+const cities = [
+    'Karachi', 'Lahore', 'Islamabad', 'Rawalpindi',
+    'Faisalabad', 'Multan', 'Peshawar', 'Quetta',
+    'Hyderabad', 'Gujranwala'
+];
+
+const facilitiesList = [
+    { id: 'air_conditioning', label: 'Air Conditioning' },
+    { id: 'sound_system', label: 'Sound System' },
+    { id: 'stage_lighting', label: 'Stage & Lighting' },
+    { id: 'parking', label: 'Parking Space' },
+    { id: 'decoration', label: 'Decoration' },
+    { id: 'photography', label: 'Photography' },
+    { id: 'security', label: 'Security' },
+    { id: 'projector', label: 'Projector & Screen' },
+    { id: 'generator', label: 'Generator Backup' }
+];
+
+const pricingSlots = [
+    { id: 'morning', label: 'Morning (8 AM - 2 PM)', price: '' },
+    { id: 'evening', label: 'Evening (2 PM - 10 PM)', price: '' },
+    { id: 'full_day', label: 'Full Day (8 AM - 10 PM)', price: '' },
+    { id: 'custom', label: 'Custom Hours', price: '' }
+];
 
 const AddVenueForm = ({ isOpen, onClose, onAddVenue, initialData }) => {
     const [currentStep, setCurrentStep] = useState(1);
@@ -9,8 +42,9 @@ const AddVenueForm = ({ isOpen, onClose, onAddVenue, initialData }) => {
     const [error, setError] = useState(null);
     const [formErrors, setFormErrors] = useState({});
 
-    // In a real app, user ID comes from auth context
     const { user } = useAuth ? useAuth() : { user: { id: 1 } };
+
+    const lastLoadedIdRef = React.useRef(null);
 
     const [formData, setFormData] = useState({
         // Basic Information
@@ -28,9 +62,8 @@ const AddVenueForm = ({ isOpen, onClose, onAddVenue, initialData }) => {
         facilities: [], // Stores facility IDs
 
         // Pricing & Payment
-        pricingSlots: [],
-        selectedSlot: '',
         price: '',
+        availability: [], // Array of { date: 'YYYY-MM-DD', slots: [] }
         accountNumber: '',
         accountHolderName: '',
         contactNumber: '',
@@ -39,45 +72,93 @@ const AddVenueForm = ({ isOpen, onClose, onAddVenue, initialData }) => {
 
     // Populate form if initialData provided (Edit Mode)
     React.useEffect(() => {
-        if (isOpen && initialData) {
-            setFormData(prev => ({
-                ...prev,
-                venueName: initialData.name || '',
-                venueType: initialData.type || '',
-                capacity: initialData.capacity || '',
-                city: initialData.city || '',
-                address: initialData.address || '',
-                description: initialData.description || '',
-                price: initialData.base_price || '',
-                // Note: Other fields (account, facilities) might be missing in list view data
-                // Ideally fetch full details here. For now, we map what we have.
-            }));
-        } else if (isOpen && !initialData) {
-            // Reset if opening in Add mode
-            setFormData({
-                venueName: '',
-                venueType: '',
-                capacity: '',
-                city: '',
-                address: '',
-                description: '',
-                photos: [],
-                facilities: [],
-                pricingSlots: [],
-                selectedSlot: '',
-                price: '',
-                accountNumber: '',
-                accountHolderName: '',
-                contactNumber: '',
-                termsAccepted: false
-            });
-            setCurrentStep(1);
+        if (!isOpen) {
+            lastLoadedIdRef.current = null;
+            return;
+        }
+
+        if (initialData) {
+            // Edit Mode Check - Only populate if venue ID changed or uninitialized
+            if (lastLoadedIdRef.current !== initialData.venue_id) {
+                // Clear errors
+                setError(null);
+                setFormErrors({});
+                setCurrentStep(1);
+
+                setFormData(prev => ({
+                    ...prev,
+                    venueName: initialData.name || '',
+                    venueType: initialData.type || '',
+                    capacity: initialData.capacity || '',
+                    city: initialData.city || '',
+                    address: initialData.address || '',
+                    description: initialData.description || '',
+                    price: initialData.base_price || '',
+
+                    // Map photos
+                    photos: initialData.images ? initialData.images.map(img => img.image_url) : [],
+
+                    // Map facilities with safety checks
+                    facilities: initialData.facilities ? initialData.facilities.map(f => {
+                        if (!f.facility_name) return null;
+                        const match = facilitiesList.find(item => item.label.toLowerCase() === f.facility_name.toLowerCase());
+                        return match ? match.id : null;
+                    }).filter(id => id !== null) : [],
+
+                    // Map availability
+                    availability: initialData.availability ? Object.entries(
+                        initialData.availability.reduce((acc, curr) => {
+                            if (!curr.date) return acc;
+                            const dateObj = new Date(curr.date);
+                            if (isNaN(dateObj.getTime())) return acc;
+                            const dateKey = `${dateObj.getFullYear()} -${String(dateObj.getMonth() + 1).padStart(2, '0')} -${String(dateObj.getDate()).padStart(2, '0')} `;
+                            if (!acc[dateKey]) acc[dateKey] = [];
+                            if (curr.is_available) acc[dateKey].push(curr.slot);
+                            return acc;
+                        }, {})
+                    ).map(([date, slots]) => ({ date, slots })) : [],
+
+                    // Map payment info
+                    accountNumber: initialData.payment_info?.account_number || '',
+                    // Safe mapping with type check to prevent crash on objects/invalid types
+                    accountHolderName: (() => {
+                        const val = initialData.payment_info?.account_holder_name || initialData.payment_info?.account_holder;
+                        if (typeof val === 'string' || typeof val === 'number') return String(val);
+                        return '';
+                    })(),
+                    contactNumber: initialData.payment_info?.contact_number || '',
+                    termsAccepted: false // User requested to uncheck this by default on edit
+                }));
+
+                lastLoadedIdRef.current = initialData.venue_id;
+            }
+        } else {
+            // Add Mode Check
+            if (lastLoadedIdRef.current !== 'add_mode') {
+                setError(null);
+                setFormErrors({});
+                setFormData({
+                    venueName: '',
+                    venueType: '',
+                    capacity: '',
+                    city: '',
+                    address: '',
+                    description: '',
+                    photos: [],
+                    facilities: [],
+                    availability: [],
+                    price: '',
+                    accountNumber: '',
+                    accountHolderName: '',
+                    contactNumber: '',
+                    termsAccepted: false
+                });
+                setCurrentStep(1);
+                lastLoadedIdRef.current = 'add_mode';
+            }
         }
     }, [isOpen, initialData]);
 
-    // ... (keep constants venueTypes etc.)
-
-    // ... (keep helper functions)
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -101,10 +182,13 @@ const AddVenueForm = ({ isOpen, onClose, onAddVenue, initialData }) => {
             payload.append('address', formData.address);
             payload.append('description', formData.description);
             payload.append('price', formData.price || 0);
-            payload.append('ownerId', user?.user_id || user?.id || 1);
+            payload.append('ownerId', user?.owner_id || user?.user_id || 1);
 
             // Append facilities (if changed, logic needed, but sending anyway)
             payload.append('facilities', JSON.stringify(formData.facilities));
+
+            // Append availability
+            payload.append('availability', JSON.stringify(formData.availability));
 
             // Append photos (Only new files)
             formData.photos.forEach((photo) => {
@@ -113,14 +197,23 @@ const AddVenueForm = ({ isOpen, onClose, onAddVenue, initialData }) => {
                 }
             });
 
+            const ownerId = user?.owner_id || user?.user_id || 1;
+            // Append ownerId to payload if not already correct (already appended above)
+
             const method = initialData ? 'PUT' : 'POST';
             const url = initialData
-                ? `http://localhost:5000/api/venues/${initialData.venue_id}`
-                : 'http://localhost:5000/api/venues';
+                ? `${API_BASE_URL}/api/owner/${ownerId}/venues/${initialData.venue_id}`
+                : `${API_BASE_URL}/api/owner/${ownerId}/venues`;
+
+            // Get token for authentication
+            const token = localStorage.getItem('token');
 
             const response = await fetch(url, {
                 method: method,
-                // Remove Content-Type header to let browser set boundary
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                // Remove Content-Type header to let browser set boundary for FormData
                 body: payload
             });
 
@@ -134,9 +227,6 @@ const AddVenueForm = ({ isOpen, onClose, onAddVenue, initialData }) => {
             if (onAddVenue) onAddVenue(data); // Notify parent
             onClose();
 
-            // Reset form
-            // ... (Reset handled by effect on open/close mostly, but good to explicit)
-
         } catch (err) {
             console.error(err);
             setError(err.message);
@@ -145,35 +235,7 @@ const AddVenueForm = ({ isOpen, onClose, onAddVenue, initialData }) => {
         }
     };
 
-    const venueTypes = [
-        'Banquet Hall', 'Garden', 'Hotel', 'Convention Center',
-        'Farmhouse', 'Marquee', 'Resort', 'Other'
-    ];
 
-    const cities = [
-        'Karachi', 'Lahore', 'Islamabad', 'Rawalpindi',
-        'Faisalabad', 'Multan', 'Peshawar', 'Quetta',
-        'Hyderabad', 'Gujranwala'
-    ];
-
-    const facilitiesList = [
-        { id: 'air_conditioning', label: 'Air Conditioning' },
-        { id: 'sound_system', label: 'Sound System' },
-        { id: 'stage_lighting', label: 'Stage & Lighting' },
-        { id: 'parking', label: 'Parking Space' },
-        { id: 'decoration', label: 'Decoration' },
-        { id: 'photography', label: 'Photography' },
-        { id: 'security', label: 'Security' },
-        { id: 'projector', label: 'Projector & Screen' },
-        { id: 'generator', label: 'Generator Backup' }
-    ];
-
-    const pricingSlots = [
-        { id: 'morning', label: 'Morning (8 AM - 2 PM)', price: '' },
-        { id: 'evening', label: 'Evening (2 PM - 10 PM)', price: '' },
-        { id: 'full_day', label: 'Full Day (8 AM - 10 PM)', price: '' },
-        { id: 'custom', label: 'Custom Hours', price: '' }
-    ];
 
     const handleInputChange = (field, value) => {
         setFormData({
@@ -197,15 +259,6 @@ const AddVenueForm = ({ isOpen, onClose, onAddVenue, initialData }) => {
 
     const handlePhotoUpload = (e) => {
         const files = Array.from(e.target.files);
-        // For this demo, we'll convert files to object URLs for preview 
-        // In real app, we might upload to S3 here or sending formData
-
-        // Since backend expects image_url string for venues.py logic we wrote, 
-        // we will mock it by using placeholder URLs if passing to backend, 
-        // OR we should have implemented file upload. 
-        // Given constraints, I'll keep the object URL for preview but 
-        // send a placeholder string to backend if it's a File object.
-
         setFormData(prev => ({
             ...prev,
             photos: [...prev.photos, ...files]
@@ -243,19 +296,9 @@ const AddVenueForm = ({ isOpen, onClose, onAddVenue, initialData }) => {
             if (formData.photos.length === 0) errors.photos = "At least one photo is required";
         }
 
-        // Step 3 (Facilities) is optional mostly, or we assume at least one? Let's leave optional.
-
         if (step === 4) {
-            if (!formData.selectedSlot) errors.selectedSlot = "Please select a pricing slot";
-
-            // Check if price is set for selected slot? 
-            // The UI has price input inside the slot map logic which updates 'pricingSlots' array?
-            // Actually the current UI code for price input wasn't connected to state properly in the view I saw earlier.
-            // It was: <input placeholder="Price" ... /> without value binding. 
-            // I need to fix that binding too.
-            // Assuming we use formData.price for simplicity as per state definition
             if (!formData.price) errors.price = "Price is required";
-
+            else if (Number(formData.price) <= 0) errors.price = "Price must be greater than 0";
             if (!formData.accountNumber.trim()) errors.accountNumber = "Account number is required";
             if (!formData.accountHolderName.trim()) errors.accountHolderName = "Account holder name is required";
             if (!formData.contactNumber.trim()) errors.contactNumber = "Contact number is required";
@@ -282,512 +325,473 @@ const AddVenueForm = ({ isOpen, onClose, onAddVenue, initialData }) => {
 
 
     const steps = [
-        { number: 1, title: 'Basic Info' },
-        { number: 2, title: 'Details' },
-        { number: 3, title: 'Facilities' },
-        { number: 4, title: 'Pricing' }
+        { number: 1, title: 'Basic Info', icon: Briefcase },
+        { number: 2, title: 'Details', icon: MapPin },
+        { number: 3, title: 'Facilities', icon: Grid },
+        { number: 4, title: 'Pricing', icon: DollarSign }
     ];
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
-            <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50 overflow-y-auto animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-white/20">
                 {/* Header */}
-                <div className="sticky top-0 bg-white border-b p-6 flex justify-between items-center z-10">
+                <div className="sticky top-0 bg-white/95 backdrop-blur-md border-b border-gray-100 p-6 flex justify-between items-center z-20">
                     <div>
-                        <h2 className="text-2xl font-bold text-gray-800">Add New Venue</h2>
-                        <p className="text-gray-600 text-sm mt-1">
-                            Complete all steps to add your venue
+                        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">{initialData ? 'Edit Venue' : 'Add New Venue'}</h2>
+                        <p className="text-gray-500 text-sm mt-1">
+                            Complete all steps to {initialData ? 'update your' : 'list a new'} property
                         </p>
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 hover:bg-gray-100 rounded-lg"
+                        className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
                     >
-                        <X size={24} className="text-gray-500" />
+                        <X size={24} />
                     </button>
                 </div>
 
                 {/* Progress Steps */}
-                <div className="px-6 py-4 border-b">
-                    <div className="flex justify-between items-center">
-                        {steps.map((step, index) => (
-                            <div key={step.number} className="flex items-center">
-                                <div className="flex flex-col items-center">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${currentStep >= step.number
-                                        ? 'bg-blue-600 border-blue-600 text-white'
-                                        : 'border-gray-300 text-gray-400'
+                <div className="px-6 py-6 border-b border-gray-50 bg-gray-50/50">
+                    <div className="flex justify-between items-center relative">
+                        {/* Connecting Line - Background */}
+                        <div className="absolute top-1/2 left-0 w-full h-1 bg-gray-200 rounded-full -z-0 -translate-y-4"></div>
+
+                        {/* Connecting Line - Progress (Simplified logic for visual) */}
+                        <div
+                            className="absolute top-1/2 left-0 h-1 bg-blue-600 rounded-full -z-0 -translate-y-4 transition-all duration-500"
+                            style={{ width: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }}
+                        ></div>
+
+
+                        {steps.map((step, index) => {
+                            const Icon = step.icon;
+                            const isActive = currentStep >= step.number;
+                            const isCompleted = currentStep > step.number;
+
+                            return (
+                                <div key={step.number} className="flex flex-col items-center z-10 relative">
+                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border-4 transition-all duration-300 shadow-sm ${isActive
+                                        ? 'bg-blue-600 border-white text-white shadow-blue-200'
+                                        : 'bg-white border-gray-100 text-gray-400'
                                         }`}>
-                                        {step.number}
+                                        {isCompleted ? <Check size={20} /> : <Icon size={20} />}
                                     </div>
-                                    <span className={`text-sm mt-2 ${currentStep >= step.number ? 'text-blue-600 font-medium' : 'text-gray-500'
+                                    <span className={`text-xs font-bold mt-2 uppercase tracking-wide transition-colors ${isActive ? 'text-blue-700' : 'text-gray-400'
                                         }`}>
                                         {step.title}
                                     </span>
                                 </div>
-                                {index < steps.length - 1 && (
-                                    <div className={`w-16 h-0.5 mx-4 ${currentStep > step.number ? 'bg-blue-600' : 'bg-gray-300'
-                                        }`} />
-                                )}
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6">
+                <form onSubmit={handleSubmit} className="p-8">
                     {error && (
-                        <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center">
-                            <AlertCircle size={20} className="mr-2" />
+                        <div className="mb-8 p-4 bg-red-50 border border-red-100 text-red-600 rounded-xl flex items-center shadow-sm animate-pulse-once">
+                            <AlertCircle size={20} className="mr-3" />
                             {error}
                         </div>
                     )}
 
                     {/* Step 1: Basic Information */}
                     {currentStep === 1 && (
-                        <div>
-                            <h3 className="text-xl font-bold text-gray-800 mb-6">Basic Information</h3>
-
-                            {/* Venue Name */}
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Venue Name *
-                                </label>
-                                <input
-                                    type="text"
-                                    value={formData.venueName}
-                                    onChange={(e) => handleInputChange('venueName', e.target.value)}
-                                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${formErrors.venueName ? 'border-red-500' : 'border-gray-300'
-                                        }`}
-                                    placeholder="Enter Your Venue Name"
-                                />
-                                {formErrors.venueName && (
-                                    <p className="text-red-500 text-sm mt-1">{formErrors.venueName}</p>
-                                )}
+                        <div className="animate-in slide-in-from-right-4 duration-300">
+                            <div className="mb-8 text-center pb-6 border-b border-gray-100">
+                                <h3 className="text-xl font-bold text-gray-900">Let's start with the basics</h3>
+                                <p className="text-gray-500 mt-1">What is the name and type of your venue?</p>
                             </div>
 
-                            {/* Venue Type */}
-                            <div className="mb-6">
-                                <label className="block text-sm font-medium text-gray-700 mb-3">
-                                    Venue Type *
-                                </label>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                    {venueTypes.map(type => (
-                                        <button
-                                            key={type}
-                                            type="button"
-                                            onClick={() => handleInputChange('venueType', type)}
-                                            className={`p-4 border rounded-lg text-center transition-colors ${formData.venueType === type
-                                                ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                                : 'border-gray-300 hover:bg-gray-50 text-gray-700'
-                                                }`}
-                                        >
-                                            {type}
-                                        </button>
-                                    ))}
+                            <div className="max-w-2xl mx-auto space-y-8">
+                                {/* Venue Name */}
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">
+                                        Venue Name <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={formData.venueName}
+                                        onChange={(e) => handleInputChange('venueName', e.target.value)}
+                                        className={`w-full px-5 py-4 bg-gray-50 border rounded-2xl focus:ring-4 focus:ring-blue-100 outline-none transition-all font-medium ${formErrors.venueName ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-blue-500'
+                                            }`}
+                                        placeholder="e.g. Royal Palace Banquet"
+                                    />
+                                    {formErrors.venueName && (
+                                        <p className="text-red-500 text-sm mt-2 font-medium flex items-center gap-1"><AlertCircle size={14} /> {formErrors.venueName}</p>
+                                    )}
                                 </div>
-                                {formErrors.venueType && (
-                                    <p className="text-red-500 text-sm mt-1">{formErrors.venueType}</p>
-                                )}
-                            </div>
 
-                            {/* Navigation Buttons */}
-                            <div className="flex justify-end">
-                                <button
-                                    type="button"
-                                    onClick={nextStep}
-                                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                                >
-                                    Next
-                                    <ArrowRight size={18} />
-                                </button>
+                                {/* Venue Type */}
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-3">
+                                        Venue Type <span className="text-red-500">*</span>
+                                    </label>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                                        {venueTypes.map(type => (
+                                            <button
+                                                key={type}
+                                                type="button"
+                                                onClick={() => handleInputChange('venueType', type)}
+                                                className={`p-4 border rounded-2xl text-left transition-all hover:-translate-y-0.5 ${formData.venueType === type
+                                                    ? 'border-blue-500 bg-blue-50 text-blue-700 ring-2 ring-blue-200 ring-offset-1 font-bold shadow-md'
+                                                    : 'border-gray-200 hover:bg-gray-50 text-gray-600 hover:border-gray-300 font-medium'
+                                                    }`}
+                                            >
+                                                {type}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {formErrors.venueType && (
+                                        <p className="text-red-500 text-sm mt-2 font-medium flex items-center gap-1"><AlertCircle size={14} /> {formErrors.venueType}</p>
+                                    )}
+                                </div>
                             </div>
                         </div>
                     )}
 
                     {/* Step 2: Capacity & Details */}
                     {currentStep === 2 && (
-                        <div>
-                            <h3 className="text-xl font-bold text-gray-800 mb-6">Venue Details</h3>
+                        <div className="animate-in slide-in-from-right-4 duration-300">
+                            <div className="mb-8 text-center pb-6 border-b border-gray-100">
+                                <h3 className="text-xl font-bold text-gray-900">Tell us more details</h3>
+                                <p className="text-gray-500 mt-1">Location, capacity, and what makes it special.</p>
+                            </div>
 
-                            <div className="space-y-6">
-                                {/* Capacity */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Capacity (Guests) *
-                                    </label>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={formData.capacity}
-                                        onChange={(e) => handleInputChange('capacity', e.target.value)}
-                                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${formErrors.capacity ? 'border-red-500' : 'border-gray-300'
-                                            }`}
-                                        placeholder="e.g. 500 (Write in Numbers)"
-                                    />
-                                    {formErrors.capacity && (
-                                        <p className="text-red-500 text-sm mt-1">{formErrors.capacity}</p>
-                                    )}
-                                </div>
-
-                                {/* City */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        City *
-                                    </label>
-                                    <select
-                                        value={formData.city}
-                                        onChange={(e) => handleInputChange('city', e.target.value)}
-                                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${formErrors.city ? 'border-red-500' : 'border-gray-300'
-                                            }`}
-                                    >
-                                        <option value="">Select City</option>
-                                        {cities.map(city => (
-                                            <option key={city} value={city}>{city}</option>
-                                        ))}
-                                    </select>
-                                    {formErrors.city && (
-                                        <p className="text-red-500 text-sm mt-1">{formErrors.city}</p>
-                                    )}
-                                </div>
-
-                                {/* Complete Address */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Complete Address *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={formData.address}
-                                        onChange={(e) => handleInputChange('address', e.target.value)}
-                                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${formErrors.address ? 'border-red-500' : 'border-gray-300'
-                                            }`}
-                                        placeholder="Plot number, street, block, area"
-                                    />
-                                    {formErrors.address && (
-                                        <p className="text-red-500 text-sm mt-1">{formErrors.address}</p>
-                                    )}
-                                </div>
-
-                                {/* Description */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Description *
-                                    </label>
-                                    <textarea
-                                        value={formData.description}
-                                        onChange={(e) => handleInputChange('description', e.target.value)}
-                                        rows="4"
-                                        className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${formErrors.description ? 'border-red-500' : 'border-gray-300'
-                                            }`}
-                                        placeholder="Describe your venue, its features and what makes it special for events"
-                                    />
-                                    {formErrors.description && (
-                                        <p className="text-red-500 text-sm mt-1">{formErrors.description}</p>
-                                    )}
-                                </div>
-
-                                {/* Photos Upload */}
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Photos *
-                                    </label>
-                                    <div className={`border-2 border-dashed rounded-lg p-8 text-center ${formErrors.photos ? 'border-red-500 bg-red-50' : 'border-gray-300'
-                                        }`}>
-                                        <Upload className="mx-auto text-gray-400 mb-3" size={48} />
-                                        <p className="text-gray-600 mb-2">Drag & drop photos here or click to browse</p>
-                                        <input
-                                            type="file"
-                                            multiple
-                                            accept="image/*"
-                                            onChange={handlePhotoUpload}
-                                            className="hidden"
-                                            id="photo-upload"
-                                        />
-                                        <label
-                                            htmlFor="photo-upload"
-                                            className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer"
-                                        >
-                                            Browse Photos
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* Left Column */}
+                                <div className="space-y-6">
+                                    {/* Capacity */}
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            Capacity (Guests) <span className="text-red-500">*</span>
                                         </label>
-                                        <p className="text-gray-500 text-sm mt-2">Supported formats: JPG, PNG, WebP</p>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={formData.capacity}
+                                            onChange={(e) => handleInputChange('capacity', e.target.value)}
+                                            className={`w-full px-5 py-3.5 bg-gray-50 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all ${formErrors.capacity ? 'border-red-300' : 'border-gray-200 focus:border-blue-500'}`}
+                                            placeholder="e.g. 500"
+                                        />
+                                        {formErrors.capacity && <p className="text-red-500 text-xs mt-1 font-medium">{formErrors.capacity}</p>}
                                     </div>
-                                    {formErrors.photos && (
-                                        <p className="text-red-500 text-sm mt-1">{formErrors.photos}</p>
-                                    )}
 
-                                    {/* Preview Uploaded Photos */}
-                                    {formData.photos.length > 0 && (
-                                        <div className="mt-4">
-                                            <h4 className="text-sm font-medium text-gray-700 mb-2">Uploaded Photos ({formData.photos.length})</h4>
-                                            <div className="grid grid-cols-4 gap-2">
+                                    {/* City */}
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            City <span className="text-red-500">*</span>
+                                        </label>
+                                        <select
+                                            value={formData.city}
+                                            onChange={(e) => handleInputChange('city', e.target.value)}
+                                            className={`w-full px-5 py-3.5 bg-gray-50 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all cursor-pointer ${formErrors.city ? 'border-red-300' : 'border-gray-200 focus:border-blue-500'}`}
+                                        >
+                                            <option value="">Select City</option>
+                                            {cities.map(city => (
+                                                <option key={city} value={city}>{city}</option>
+                                            ))}
+                                        </select>
+                                        {formErrors.city && <p className="text-red-500 text-xs mt-1 font-medium">{formErrors.city}</p>}
+                                    </div>
+
+                                    {/* Address */}
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            Complete Address <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea
+                                            rows="3"
+                                            value={formData.address}
+                                            onChange={(e) => handleInputChange('address', e.target.value)}
+                                            className={`w-full px-5 py-3.5 bg-gray-50 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all resize-none ${formErrors.address ? 'border-red-300' : 'border-gray-200 focus:border-blue-500'}`}
+                                            placeholder="Plot number, street, block..."
+                                        />
+                                        {formErrors.address && <p className="text-red-500 text-xs mt-1 font-medium">{formErrors.address}</p>}
+                                    </div>
+                                </div>
+
+                                {/* Right Column */}
+                                <div className="space-y-6">
+                                    {/* Description */}
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            Description <span className="text-red-500">*</span>
+                                        </label>
+                                        <textarea
+                                            value={formData.description}
+                                            onChange={(e) => handleInputChange('description', e.target.value)}
+                                            rows="4"
+                                            className={`w-full px-5 py-3.5 bg-gray-50 border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all resize-none ${formErrors.description ? 'border-red-300' : 'border-gray-200 focus:border-blue-500'}`}
+                                            placeholder="Describe venue features, ambiance, and suitability..."
+                                        />
+                                        {formErrors.description && <p className="text-red-500 text-xs mt-1 font-medium">{formErrors.description}</p>}
+                                    </div>
+
+                                    {/* Photos Upload */}
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            Photos <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all ${formErrors.photos ? 'border-red-300 bg-red-50' : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/50'
+                                            }`}>
+                                            <Upload className="mx-auto text-blue-500 mb-3" size={32} />
+                                            <p className="text-gray-900 font-medium mb-1">Click to upload photos</p>
+                                            <p className="text-gray-500 text-xs mb-4">JPG, PNG, WebP up to 5MB</p>
+                                            <input
+                                                type="file"
+                                                multiple
+                                                accept="image/*"
+                                                onChange={handlePhotoUpload}
+                                                className="hidden"
+                                                id="photo-upload"
+                                            />
+                                            <label
+                                                htmlFor="photo-upload"
+                                                className="inline-block px-5 py-2 bg-white border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-300 cursor-pointer text-sm font-bold shadow-sm transition-all"
+                                            >
+                                                Browse Files
+                                            </label>
+                                        </div>
+                                        {formErrors.photos && <p className="text-red-500 text-xs mt-2 font-medium">{formErrors.photos}</p>}
+
+                                        {/* Preview Uploaded Photos */}
+                                        {formData.photos.length > 0 && (
+                                            <div className="mt-4 grid grid-cols-4 gap-2">
                                                 {formData.photos.map((photo, index) => (
-                                                    <div key={index} className="relative group">
+                                                    <div key={index} className="relative group aspect-square rounded-xl overflow-hidden shadow-sm border border-gray-100">
                                                         <img
-                                                            src={URL.createObjectURL(photo)}
+                                                            src={photo instanceof File ? URL.createObjectURL(photo) : photo}
                                                             alt={`Preview ${index + 1}`}
-                                                            className="w-full h-24 object-cover rounded-lg"
-                                                            onLoad={() => {
-                                                                // Revoke URL to free memory if needed, but keeping for render
-                                                            }}
+                                                            className="w-full h-full object-cover"
                                                         />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => handleRemovePhoto(index)}
-                                                            className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        >
-                                                            <X size={14} />
-                                                        </button>
+                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleRemovePhoto(index)}
+                                                                className="bg-white/20 hover:bg-red-500/80 p-1.5 rounded-full text-white backdrop-blur-sm transition-colors"
+                                                            >
+                                                                <X size={16} />
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                 ))}
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-
-                            {/* Navigation Buttons */}
-                            <div className="flex justify-between mt-8">
-                                <button
-                                    type="button"
-                                    onClick={prevStep}
-                                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-2"
-                                >
-                                    <ArrowLeft size={18} />
-                                    Back
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={nextStep}
-                                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                                >
-                                    Next
-                                    <ArrowRight size={18} />
-                                </button>
                             </div>
                         </div>
                     )}
 
                     {/* Step 3: Facilities & Amenities */}
                     {currentStep === 3 && (
-                        <div>
-                            <h3 className="text-xl font-bold text-gray-800 mb-6">Facilities & Amenities</h3>
-
-                            <div className="mb-6">
-                                <p className="text-gray-600 mb-4">
-                                    Select all facilities and amenities available at your venue.
-                                </p>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {facilitiesList.map(facility => (
-                                        <div key={facility.id} className="flex items-center">
-                                            <input
-                                                type="checkbox"
-                                                id={facility.id}
-                                                checked={formData.facilities.includes(facility.id)}
-                                                onChange={() => handleFacilityToggle(facility.id)}
-                                                className="h-5 w-5 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                                            />
-                                            <label htmlFor={facility.id} className="ml-3 text-gray-700">
-                                                {facility.label}
-                                            </label>
-                                        </div>
-                                    ))}
-                                </div>
+                        <div className="animate-in slide-in-from-right-4 duration-300">
+                            <div className="mb-8 text-center pb-6 border-b border-gray-100">
+                                <h3 className="text-xl font-bold text-gray-900">What facilities do you offer?</h3>
+                                <p className="text-gray-500 mt-1">Select all expected amenities.</p>
                             </div>
 
-                            {/* Navigation Buttons */}
-                            <div className="flex justify-between mt-8">
-                                <button
-                                    type="button"
-                                    onClick={prevStep}
-                                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-2"
-                                >
-                                    <ArrowLeft size={18} />
-                                    Back
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={nextStep}
-                                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                                >
-                                    Next
-                                    <ArrowRight size={18} />
-                                </button>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {facilitiesList.map(facility => (
+                                    <div key={facility.id}
+                                        onClick={() => handleFacilityToggle(facility.id)}
+                                        className={`flex items-center p-4 border rounded-2xl cursor-pointer transition-all ${formData.facilities.includes(facility.id)
+                                            ? 'bg-blue-50 border-blue-500 shadow-sm ring-1 ring-blue-500'
+                                            : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                                            }`}>
+                                        <div className={`w-6 h-6 rounded-md border flex items-center justify-center mr-3 transition-colors ${formData.facilities.includes(facility.id)
+                                            ? 'bg-blue-600 border-blue-600 text-white'
+                                            : 'border-gray-300 bg-white'
+                                            }`}>
+                                            {formData.facilities.includes(facility.id) && <Check size={14} strokeWidth={3} />}
+                                        </div>
+                                        <label className="cursor-pointer font-medium text-gray-700 select-none">
+                                            {facility.label}
+                                        </label>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     )}
 
                     {/* Step 4: Pricing & Payment Information */}
                     {currentStep === 4 && (
-                        <div>
-                            <h3 className="text-xl font-bold text-gray-800 mb-6">Pricing & Payment Information</h3>
+                        <div className="animate-in slide-in-from-right-4 duration-300">
+                            <div className="mb-8 text-center pb-6 border-b border-gray-100">
+                                <h3 className="text-xl font-bold text-gray-900">Final Details</h3>
+                                <p className="text-gray-500 mt-1">Set your pricing and account info.</p>
+                            </div>
 
-                            <div className="space-y-6">
+                            <div className="space-y-8">
                                 {/* Pricing Cards */}
+                                {/* Pricing & Availability */}
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-3">
-                                        Pricing Slots *
-                                    </label>
-                                    <p className="text-gray-600 mb-4 text-sm">
-                                        Select any one slot from the drop down menu and set the price for each slot
-                                    </p>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {pricingSlots.map(slot => (
-                                            <div
-                                                key={slot.id}
-                                                className={`border rounded-lg p-4 cursor-pointer ${formData.selectedSlot === slot.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-                                                    }`}
-                                                onClick={() => handleInputChange('selectedSlot', slot.id)}
-                                            >
-                                                <div className="flex justify-between items-start mb-3">
-                                                    <h4 className="font-medium text-gray-800">{slot.label}</h4>
-                                                    <div className="flex items-center">
-                                                        <input
-                                                            type="radio"
-                                                            checked={formData.selectedSlot === slot.id}
-                                                            onChange={() => handleInputChange('selectedSlot', slot.id)}
-                                                            className="h-4 w-4 text-blue-600"
-                                                        />
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                                                    <span className="text-gray-500">Rs.</span>
-                                                    <input
-                                                        type="number"
-                                                        placeholder="Price"
-                                                        value={formData.selectedSlot === slot.id ? formData.price : ''}
-                                                        onChange={(e) => {
-                                                            if (formData.selectedSlot === slot.id) {
-                                                                handleInputChange('price', e.target.value);
-                                                            }
-                                                        }}
-                                                        disabled={formData.selectedSlot !== slot.id}
-                                                        className="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                                        min="0"
-                                                    />
-                                                </div>
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h4 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                                            <div className="p-2 bg-green-100 rounded-lg text-green-600">
+                                                <DollarSign size={20} />
                                             </div>
-                                        ))}
+                                            Pricing & Availability
+                                        </h4>
                                     </div>
-                                    {formErrors.selectedSlot && (
-                                        <p className="text-red-500 text-sm mt-1">{formErrors.selectedSlot}</p>
-                                    )}
-                                    {formErrors.price && (
-                                        <p className="text-red-500 text-sm mt-1">{formErrors.price}</p>
-                                    )}
+
+                                    {/* Base Price Input */}
+                                    <div className="mb-8">
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                                            Base Price (per booking) <span className="text-red-500">*</span>
+                                        </label>
+                                        <div className="relative">
+                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Rs.</span>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                value={formData.price}
+                                                onChange={(e) => handleInputChange('price', e.target.value)}
+                                                className={`w-full pl-12 pr-4 py-4 bg-white border rounded-xl focus:ring-4 focus:ring-blue-100 outline-none transition-all font-bold text-lg ${formErrors.price ? 'border-red-300 focus:border-red-500' : 'border-gray-200 focus:border-blue-500'}`}
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                        {formErrors.price && <p className="text-red-500 text-sm mt-2 font-medium">{formErrors.price}</p>}
+                                    </div>
+
+                                    {/* Calendar Section */}
+                                    <div>
+                                        <label className="block text-sm font-bold text-gray-700 mb-4 flex items-center justify-between">
+                                            <span>Manage Availability <span className="text-red-500">*</span></span>
+                                            <span className="text-xs font-normal text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
+                                                Select dates to set open slots
+                                            </span>
+                                        </label>
+
+                                        <AvailabilityCalendar
+                                            availability={formData.availability}
+                                            onChange={(newAvailability) => handleInputChange('availability', newAvailability)}
+                                        />
+                                        <p className="text-xs text-gray-500 mt-3 ml-1">
+                                            * Default: All dates are unavailable until you enable slots. Click a date to add slots (Morning/Evening/Full Day).
+                                        </p>
+                                    </div>
                                 </div>
 
                                 {/* Account Information */}
-                                <div className="bg-gray-50 rounded-lg p-6">
-                                    <h4 className="font-medium text-gray-700 mb-4">Bank Account Information</h4>
+                                <div className="bg-gray-50/80 rounded-3xl p-6 border border-gray-200">
+                                    <h4 className="font-bold text-gray-900 mb-6 flex items-center gap-2">
+                                        <Briefcase size={20} className="text-gray-500" />
+                                        Bank Account Details
+                                    </h4>
 
-                                    <div className="space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Account Number *
+                                            <label className="block text-xs uppercase tracking-wider font-bold text-gray-500 mb-2">
+                                                Account Number
                                             </label>
                                             <input
                                                 type="text"
                                                 value={formData.accountNumber}
                                                 onChange={(e) => handleInputChange('accountNumber', e.target.value)}
-                                                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${formErrors.accountNumber ? 'border-red-500' : 'border-gray-300'
-                                                    }`}
+                                                className={`w-full px-4 py-3 bg-white border rounded-xl focus:ring-2 focus:ring-blue-200 outline-none font-medium ${formErrors.accountNumber ? 'border-red-300' : 'border-gray-200'}`}
+                                                placeholder="XXXX-XXXX-XXXX-XXXX"
                                             />
-                                            {formErrors.accountNumber && (
-                                                <p className="text-red-500 text-sm mt-1">{formErrors.accountNumber}</p>
-                                            )}
+                                            {formErrors.accountNumber && <p className="text-red-500 text-xs mt-1 font-medium">{formErrors.accountNumber}</p>}
                                         </div>
 
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Account Holder Name *
+                                            <label className="block text-xs uppercase tracking-wider font-bold text-gray-500 mb-2">
+                                                Account Holder
                                             </label>
                                             <input
                                                 type="text"
                                                 value={formData.accountHolderName}
                                                 onChange={(e) => handleInputChange('accountHolderName', e.target.value)}
-                                                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${formErrors.accountHolderName ? 'border-red-500' : 'border-gray-300'
-                                                    }`}
+                                                className={`w-full px-4 py-3 bg-white border rounded-xl focus:ring-2 focus:ring-blue-200 outline-none font-medium ${formErrors.accountHolderName ? 'border-red-300' : 'border-gray-200'}`}
+                                                placeholder="Name on account"
                                             />
-                                            {formErrors.accountHolderName && (
-                                                <p className="text-red-500 text-sm mt-1">{formErrors.accountHolderName}</p>
-                                            )}
+                                            {formErrors.accountHolderName && <p className="text-red-500 text-xs mt-1 font-medium">{formErrors.accountHolderName}</p>}
                                         </div>
 
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                Contact Number *
-                                            </label>
-                                            <input
-                                                type="text"
+                                        <div className="md:col-span-2">
+                                            <PhoneInput
                                                 value={formData.contactNumber}
                                                 onChange={(e) => handleInputChange('contactNumber', e.target.value)}
-                                                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${formErrors.contactNumber ? 'border-red-500' : 'border-gray-300'
-                                                    }`}
+                                                error={formErrors.contactNumber}
+                                                label="Contact Number"
+                                                className={`bg-white focus:ring-2 focus:ring-blue-200 ${formErrors.contactNumber ? 'border-red-300' : 'border-gray-200'}`}
                                             />
-                                            {formErrors.contactNumber && (
-                                                <p className="text-red-500 text-sm mt-1">{formErrors.contactNumber}</p>
-                                            )}
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Terms & Conditions */}
-                                <div>
-                                    <div className="flex items-start">
-                                        <input
-                                            type="checkbox"
-                                            id="terms"
-                                            checked={formData.termsAccepted}
-                                            onChange={(e) => handleInputChange('termsAccepted', e.target.checked)}
-                                            className="h-5 w-5 text-blue-600 rounded border-gray-300 mt-1"
-                                        />
-                                        <label htmlFor="terms" className="ml-3 text-gray-700">
-                                            By checking this checkbox, I accept all the Terms & Conditions
-                                        </label>
-                                    </div>
-                                    {formErrors.termsAccepted && (
-                                        <p className="text-red-500 text-sm mt-1 ml-8">{formErrors.termsAccepted}</p>
-                                    )}
+                                <div className="pt-4 border-t border-gray-100">
+                                    <label className="flex items-center cursor-pointer group">
+                                        <div className="relative">
+                                            <input
+                                                type="checkbox"
+                                                checked={formData.termsAccepted}
+                                                onChange={(e) => handleInputChange('termsAccepted', e.target.checked)}
+                                                className="peer sr-only"
+                                            />
+                                            <div className="w-6 h-6 border-2 border-gray-300 rounded md:rounded-md peer-checked:bg-blue-600 peer-checked:border-blue-600 transition-all"></div>
+                                            <Check size={16} className="absolute top-0.5 left-0.5 text-white opacity-0 peer-checked:opacity-100 transition-opacity pointer-events-none" strokeWidth={3} />
+                                        </div>
+                                        <span className="ml-3 text-sm text-gray-600 group-hover:text-gray-900 transition-colors">
+                                            I verify that all information provided is accurate and I accept the <span className="text-blue-600 font-bold underline">Terms & Conditions</span>.
+                                        </span>
+                                    </label>
+                                    {formErrors.termsAccepted && <p className="text-red-500 text-xs mt-2 ml-9 font-medium">{formErrors.termsAccepted}</p>}
                                 </div>
-                            </div>
-
-                            {/* Navigation Buttons */}
-                            <div className="flex justify-between mt-8">
-                                <button
-                                    type="button"
-                                    onClick={prevStep}
-                                    className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 flex items-center gap-2"
-                                    disabled={loading}
-                                >
-                                    <ArrowLeft size={18} />
-                                    Back
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 disabled:opacity-50"
-                                    disabled={loading}
-                                >
-                                    {loading ? (
-                                        <span>Submitting...</span>
-                                    ) : (
-                                        <>
-                                            <Save size={18} />
-                                            Submit Request
-                                        </>
-                                    )}
-                                </button>
                             </div>
                         </div>
                     )}
-                </form>
 
-                {/* Step Indicator */}
-                <div className="p-4 border-t bg-gray-50 text-center text-sm text-gray-500">
-                    Step {currentStep} of {steps.length}
-                </div>
+                    {/* Footer Navigation */}
+                    <div className="mt-10 pt-6 border-t border-gray-100 flex justify-between items-center">
+                        <div>
+                            {currentStep > 1 && (
+                                <button
+                                    type="button"
+                                    onClick={prevStep}
+                                    className="px-6 py-3 rounded-xl text-gray-600 font-bold hover:bg-gray-100 transition-all flex items-center gap-2 group"
+                                    disabled={loading}
+                                >
+                                    <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                                    Back
+                                </button>
+                            )}
+                        </div>
+
+                        {currentStep < 4 ? (
+                            <button
+                                type="button"
+                                onClick={nextStep}
+                                className="px-8 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-black transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 flex items-center gap-2"
+                            >
+                                Next Step
+                                <ArrowRight size={18} />
+                            </button>
+                        ) : (
+                            <button
+                                type="submit"
+                                className="px-8 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 hover:shadow-xl hover:shadow-blue-300 hover:-translate-y-0.5 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <>
+                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                        Processing...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Save size={18} />
+                                        Submit Venue
+                                    </>
+                                )}
+                            </button>
+                        )}
+                    </div>
+                </form>
             </div>
         </div>
     );

@@ -1,5 +1,7 @@
-import React from 'react';
+import { User, Mail, Phone, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
+import PhoneInput from '../common/PhoneInput';
 
+// Component 2: Contact Information
 const ContactInformation = ({ data, onUpdate, onNext, onBack }) => {
     const handleChange = (field, value) => {
         onUpdate({ ...data, [field]: value });
@@ -10,98 +12,95 @@ const ContactInformation = ({ data, onUpdate, onNext, onBack }) => {
     };
 
     return (
-        <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg">
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">Contact Information</h1>
-            <p className="text-gray-600 mb-6">Please provide your contact details</p>
+        <div className="bg-white/80 backdrop-blur-md rounded-3xl shadow-xl p-8 border border-white/50">
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Contact Details</h1>
+            <p className="text-gray-500 mb-8">How can we reach you regarding this booking?</p>
 
             <div className="space-y-6">
                 {/* Full Name */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Full Name *
+                <div className="space-y-2">
+                    <label className="block text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <User className="w-4 h-4 text-blue-500" />
+                        Full Name <span className="text-red-500">*</span>
                     </label>
                     <input
                         type="text"
                         value={data.fullName || ''}
                         onChange={(e) => handleChange('fullName', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-gray-700 hover:bg-white placeholder-gray-400"
                         placeholder="Enter Your Full Name"
                         required
                     />
                 </div>
 
-                {/* Email Address */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Email Address *
-                    </label>
-                    <input
-                        type="email"
-                        value={data.email || ''}
-                        onChange={(e) => handleChange('email', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                        placeholder="Enter Your Email Address"
-                        required
-                    />
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Email Address */}
+                    <div className="space-y-2">
+                        <label className="block text-sm font-bold text-gray-700 flex items-center gap-2">
+                            <Mail className="w-4 h-4 text-blue-500" />
+                            Email Address <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="email"
+                            value={data.email || ''}
+                            onChange={(e) => handleChange('email', e.target.value)}
+                            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-gray-700 hover:bg-white placeholder-gray-400"
+                            placeholder="Enter Your Email Address"
+                            required
+                        />
+                    </div>
 
-                {/* Phone Number */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Phone Number *
-                    </label>
-                    <input
-                        type="tel"
+                    {/* Phone Number */}
+                    <PhoneInput
                         value={data.phoneNumber || ''}
                         onChange={(e) => handleChange('phoneNumber', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                        placeholder="Enter Your Phone Number"
                         required
+                        label="Phone Number"
                     />
                 </div>
 
                 {/* Alternative Phone Number */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Alternative Phone Number
-                    </label>
-                    <input
-                        type="tel"
-                        value={data.alternativePhone || ''}
-                        onChange={(e) => handleChange('alternativePhone', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                        placeholder="Enter Your Second Phone Number"
-                    />
-                </div>
+                <PhoneInput
+                    value={data.alternativePhone || ''}
+                    onChange={(e) => handleChange('alternativePhone', e.target.value)}
+                    label="Alternative Phone Number"
+                    placeholder="Enter Second Phone Number (Optional)"
+                />
 
                 {/* Special Requirements */}
-                <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Special Requirement/Notes
+                <div className="space-y-2">
+                    <label className="block text-sm font-bold text-gray-700 flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-blue-500" />
+                        Special Requirement / Notes
                     </label>
                     <textarea
                         value={data.specialRequirements || ''}
                         onChange={(e) => handleChange('specialRequirements', e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                        rows="4"
-                        placeholder="Any special arrangement, dietary restrictions, accessibility needs, etc"
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 outline-none transition-all font-medium text-gray-700 hover:bg-white placeholder-gray-400 min-h-[120px]"
+                        placeholder="Any special arrangement, dietary restrictions, accessibility needs, etc."
                     />
                 </div>
 
                 {/* Navigation */}
-                <div className="pt-4 border-t border-gray-200 flex gap-4">
+                <div className="pt-6 border-t border-gray-100 flex gap-4">
                     <button
                         onClick={onBack}
-                        className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                        className="flex-1 py-4 border-2 border-gray-200 text-gray-600 rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 transition-all flex items-center justify-center gap-2"
                     >
-                        ← Back
+                        <ChevronLeft className="w-5 h-5" /> Back
                     </button>
                     <button
                         onClick={onNext}
                         disabled={!isFormValid()}
-                        className="flex-1 bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                        className={`
+              flex-[2] py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 transition-all duration-300
+              ${!isFormValid()
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 hover:-translate-y-1 hover:shadow-blue-500/30'
+                            }
+            `}
                     >
-                        Next → Additional Services
+                        Next Step <ChevronRight className="w-5 h-5 ml-1" />
                     </button>
                 </div>
             </div>

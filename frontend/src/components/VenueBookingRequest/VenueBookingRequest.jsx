@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Calendar, 
-  Clock, 
-  Users, 
-  DollarSign, 
-  CheckCircle, 
+import {
+  Calendar,
+  Clock,
+  Users,
+  DollarSign,
+  CheckCircle,
   XCircle,
-  Mail, 
+  Mail,
   Phone,
-  MoreVertical 
+  MoreVertical
 } from 'lucide-react';
 
 // ===== SUBCOMPONENTS =====
@@ -52,11 +52,11 @@ const StatusBadge = ({ status }) => {
 };
 
 // Action Button Component
-const ActionButton = ({ 
-  variant = 'primary', 
-  icon: Icon, 
-  label, 
-  onClick 
+const ActionButton = ({
+  variant = 'primary',
+  icon: Icon,
+  label,
+  onClick
 }) => {
   const variants = {
     primary: 'bg-blue-600 text-white hover:bg-blue-700',
@@ -141,20 +141,20 @@ const VenueBookingRequest = () => {
   const handleApprove = () => {
     setBookingStatus('approved');
     // In a real app, you would make an API call here
-    console.log('Booking approved');
+    ('Booking approved');
   };
 
   // Handle booking rejection
   const handleReject = () => {
     setBookingStatus('rejected');
     // In a real app, you would make an API call here
-    console.log('Booking rejected');
+    ('Booking rejected');
   };
 
   // Handle contact customer
   const handleContact = () => {
     // In a real app, this would trigger email/phone functionality
-    console.log('Contact customer');
+    ('Contact customer');
   };
 
   return (
@@ -190,7 +190,7 @@ const VenueBookingRequest = () => {
               New Booking Request from {bookingData.customer.name}
             </h4>
             <p className="text-gray-600">
-              A customer has requested to book your venue for their wedding event. 
+              A customer has requested to book your venue for their wedding event.
               Please review the details and respond within 24 hours.
             </p>
           </div>
@@ -207,7 +207,7 @@ const VenueBookingRequest = () => {
                   <h3 className="font-bold text-lg text-gray-800">
                     {bookingData.customer.name}
                   </h3>
-                  <ContactInfo 
+                  <ContactInfo
                     email={bookingData.customer.email}
                     phone={bookingData.customer.phone}
                   />
@@ -219,37 +219,37 @@ const VenueBookingRequest = () => {
             {/* Middle Column - Event Details */}
             <div className="lg:col-span-2 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <InfoRow 
-                  icon={Calendar} 
-                  label="Event Type" 
-                  value={bookingData.eventDetails.type} 
+                <InfoRow
+                  icon={Calendar}
+                  label="Event Type"
+                  value={bookingData.eventDetails.type}
                 />
-                <InfoRow 
-                  icon={Calendar} 
-                  label="Event Date" 
-                  value={bookingData.eventDetails.date} 
+                <InfoRow
+                  icon={Calendar}
+                  label="Event Date"
+                  value={bookingData.eventDetails.date}
                 />
-                <InfoRow 
-                  icon={Clock} 
-                  label="Time Slot" 
-                  value={bookingData.eventDetails.timeSlot} 
+                <InfoRow
+                  icon={Clock}
+                  label="Time Slot"
+                  value={bookingData.eventDetails.timeSlot}
                 />
-                <InfoRow 
-                  icon={Users} 
-                  label="Expected Guests" 
-                  value={bookingData.eventDetails.guests} 
+                <InfoRow
+                  icon={Users}
+                  label="Expected Guests"
+                  value={bookingData.eventDetails.guests}
                 />
               </div>
-              
+
               <div className="p-4 bg-blue-50 rounded-lg">
-                <InfoRow 
-                  icon={DollarSign} 
-                  label="Total Amount" 
+                <InfoRow
+                  icon={DollarSign}
+                  label="Total Amount"
                   value={
                     <span className="text-2xl font-bold text-blue-700">
                       {bookingData.eventDetails.amount}
                     </span>
-                  } 
+                  }
                 />
               </div>
 
@@ -258,28 +258,28 @@ const VenueBookingRequest = () => {
           </div>
 
           {/* Action Buttons */}
-          <motion.div 
+          <motion.div
             className="flex flex-wrap gap-4 mt-8 pt-6 border-t border-gray-200"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.2 }}
           >
-            <ActionButton 
+            <ActionButton
               variant="danger"
               icon={XCircle}
               label="Reject Request"
               onClick={handleReject}
             />
-            
+
             <div className="flex-1"></div>
-            
-            <ActionButton 
+
+            <ActionButton
               variant="outline"
               label="Contact Customer"
               onClick={handleContact}
             />
-            
-            <ActionButton 
+
+            <ActionButton
               variant="primary"
               icon={CheckCircle}
               label="Approve Booking"
@@ -296,7 +296,7 @@ const VenueBookingRequest = () => {
               <MoreVertical className="w-4 h-4" />
               {showDetails ? 'Hide Full Details' : 'View Full Details'}
             </button>
-            
+
             {showDetails && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}

@@ -1,7 +1,9 @@
-// components/PersonalInfoTable.jsx
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, Save, Loader2 } from 'lucide-react';
+import PhoneInput from '../common/PhoneInput';
+import { userService } from '../../services/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 const PersonalInfoTable = ({ user }) => {
   const [isEditing, setIsEditing] = useState(false);
@@ -17,11 +19,33 @@ const PersonalInfoTable = ({ user }) => {
     return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };
 
-  const handleSave = () => {
-    // TODO: Implement API call to update user information
-    console.log('Saving user data:', editedData);
-    alert('Save functionality will be implemented with backend API');
-    setIsEditing(false);
+  const { token, checkAuth } = useAuth();
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleSave = async () => {
+    try {
+      setIsSaving(true);
+      setError(null);
+
+      const userId = user.user_id || user.id;
+
+      await userService.updateProfile(userId, {
+        name: editedData.name,
+        phone: editedData.phone
+        // Email usually not editable directly or needs separate handling, keeping it if backend allows or just ignoring
+      }, token);
+
+      // Refresh user data in context
+      await checkAuth();
+
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Failed to update profile:', err);
+      setError(err.message || 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -120,12 +144,10 @@ const PersonalInfoTable = ({ user }) => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
-                <input
-                  type="tel"
+                <PhoneInput
                   value={editedData.phone}
                   onChange={(e) => setEditedData({ ...editedData, phone: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none"
+                  label="Phone Number"
                 />
               </div>
             </div>
@@ -139,13 +161,28 @@ const PersonalInfoTable = ({ user }) => {
               </button>
               <button
                 onClick={handleSave}
-                className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all font-medium"
+                disabled={isSaving}
+                className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all font-medium flex items-center justify-center gap-2 disabled:opacity-70"
               >
-                Save Changes
+                {isSaving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save Changes
+                  </>
+                )}
               </button>
             </div>
-          </motion.div>
-        </div>
+            {error && (
+              <p className="mt-2 text-sm text-red-500 text-center">{error}</p>
+            )}
+
+          </motion.div >
+        </div >
       )}
     </>
   );

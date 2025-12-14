@@ -1,4 +1,5 @@
 import React from 'react';
+import { API_BASE_URL } from '../services/api';
 import { usePagination } from '../hooks/usePagination';
 import Pagination from './Pagination';
 
@@ -15,7 +16,7 @@ const VenueListWithPagination = () => {
         currentPage,
         totalPages,
         goToPage
-    } = usePagination('http://localhost:5000/api/venues', {
+    } = usePagination(`${API_BASE_URL}/api/venues`, {
         sort_by: 'rating',
         sort_order: 'desc'
     });

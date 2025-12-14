@@ -7,7 +7,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import { ownerService } from '../../services/api';
 import { Eye, Edit, Check } from 'lucide-react';
 import VenueDetailsModal from './modals/VenueDetailsModal';
-import EditVenueModal from './modals/EditVenueModal';
 import BookingDetailsModal from './modals/BookingDetailsModal';
 
 const Dashboard = () => {
@@ -26,7 +25,6 @@ const Dashboard = () => {
   const [selectedVenue, setSelectedVenue] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [showVenueDetails, setShowVenueDetails] = useState(false);
-  const [showEditVenue, setShowEditVenue] = useState(false);
   const [showBookingDetails, setShowBookingDetails] = useState(false);
 
   const userData = {
@@ -76,31 +74,7 @@ const Dashboard = () => {
     }
   };
 
-  const handleEditVenue = async (venueId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const ownerId = user.owner_id || user.user_id;
-      const venueData = await ownerService.getVenueDetails(ownerId, venueId, token);
-      setSelectedVenue(venueData);
-      setShowEditVenue(true);
-    } catch (error) {
-      console.error('Error fetching venue details:', error);
-      alert('Failed to load venue details');
-    }
-  };
 
-  const handleSaveVenue = async (formData) => {
-    try {
-      const token = localStorage.getItem('token');
-      const ownerId = user.owner_id || user.user_id;
-      await ownerService.updateVenue(ownerId, selectedVenue.venue_id, formData, token);
-      alert('Venue updated successfully!');
-      fetchDashboard(); // Refresh data
-    } catch (error) {
-      console.error('Error updating venue:', error);
-      throw error;
-    }
-  };
 
 
 
@@ -193,13 +167,7 @@ const Dashboard = () => {
                             >
                               <Eye size={18} className="text-blue-600" />
                             </button>
-                            <button
-                              onClick={() => handleEditVenue(venue.venue_id)}
-                              className="p-2 hover:bg-green-100 rounded-lg transition"
-                              title="Edit Venue"
-                            >
-                              <Edit size={18} className="text-green-600" />
-                            </button>
+
 
                           </div>
                         </td>
@@ -283,16 +251,7 @@ const Dashboard = () => {
         />
       )}
 
-      {showEditVenue && (
-        <EditVenueModal
-          venue={selectedVenue}
-          onClose={() => {
-            setShowEditVenue(false);
-            setSelectedVenue(null);
-          }}
-          onSave={handleSaveVenue}
-        />
-      )}
+
 
       {showBookingDetails && (
         <BookingDetailsModal

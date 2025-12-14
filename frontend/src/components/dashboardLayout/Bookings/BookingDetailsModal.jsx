@@ -20,7 +20,7 @@ const BookingDetailsModal = ({
 
     const handleSaveNotes = () => {
         // In a real app, you would update the booking in your database
-        console.log('Saving notes:', notes);
+        ('Saving notes:', notes);
         setIsEditing(false);
     };
 
@@ -183,8 +183,8 @@ const BookingDetailsModal = ({
                                                 onClick={() => handleStatusChange(option.value)}
                                                 disabled={booking.status === option.value}
                                                 className={`p-3 rounded-lg border text-center ${booking.status === option.value
-                                                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                                                        : 'border-gray-300 hover:bg-gray-50'
+                                                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                                    : 'border-gray-300 hover:bg-gray-50'
                                                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                                             >
                                                 <div className={`font-medium ${option.color}`}>

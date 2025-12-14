@@ -4,7 +4,7 @@ Logging utility functions for VenueBook
 Provides centralized logging for all system activities
 """
 
-from config import get_db_connection
+from utils.db import get_db_connection
 from datetime import datetime
 
 def log_action(action_by, action_type, target_table, details):
@@ -29,7 +29,8 @@ def log_action(action_by, action_type, target_table, details):
             VALUES (%s, %s, %s, %s)
         """
         
-        cursor.execute(query, (action_by, action_type, target_table, details))
+        # Convert action_type to uppercase
+        cursor.execute(query, (action_by, action_type.upper() if action_type else None, target_table, details))
         conn.commit()
         
         log_id = cursor.lastrowid
@@ -95,7 +96,7 @@ def log_payment_action(user_id, action_type, payment_id, details):
 
 def log_review_action(user_id, action_type, review_id, details):
     """Log review-related actions"""
-    return log_action(user_id, action_type, 'booking_reviews', f"Review #{review_id}: {details}")
+    return log_action(user_id, action_type, 'venue_reviews', f"Review #{review_id}: {details}")
 
 
 def log_admin_action(admin_id, action_type, target_table, details):

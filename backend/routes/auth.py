@@ -11,6 +11,7 @@ import bcrypt
 from utils.db import get_db_connection
 from utils.decorators import token_required
 from utils.log_utils import log_signup, log_login, log_logout
+from utils.phone_validation import validate_phone_format
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
@@ -28,6 +29,12 @@ def signup():
         
         if not all([name, email, password]):
             return jsonify({'error': 'Missing required fields'}), 400
+
+        # Validate phone
+        if phone:
+            is_valid, error = validate_phone_format(phone)
+            if not is_valid:
+                return jsonify({'error': error}), 400
         
         conn = get_db_connection()
         cursor = conn.cursor()

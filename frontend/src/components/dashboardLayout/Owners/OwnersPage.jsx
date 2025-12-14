@@ -235,7 +235,6 @@ const OwnersPage = () => {
 const OwnerDetailsModal = ({ owner, onClose, onVenueClick }) => {
     if (!owner) return null;
 
-    // Helper to format currency
     const formatCurrency = (amount) => {
         return new Intl.NumberFormat('en-PK', {
             style: 'currency',
@@ -244,62 +243,120 @@ const OwnerDetailsModal = ({ owner, onClose, onVenueClick }) => {
         }).format(amount);
     };
 
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
+
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6 border-b border-gray-100 flex justify-between items-start sticky top-0 bg-white z-10">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-5xl w-full max-h-[90vh] overflow-hidden shadow-2xl animate-in slide-in-from-bottom-4 duration-300">
+                {/* Header */}
+                <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-indigo-600 px-8 py-6 flex justify-between items-center z-10">
                     <div>
-                        <h2 className="text-xl font-bold text-gray-900">Owner Details</h2>
-                        <p className="text-sm text-gray-500">View complete owner profile and venues</p>
+                        <h2 className="text-2xl font-bold text-white">Owner Profile</h2>
+                        <p className="text-purple-100 text-sm mt-0.5">{owner.owner?.business_name || owner.owner?.name}</p>
                     </div>
-                    <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
-                        <X size={20} className="text-gray-500" />
+                    <button
+                        onClick={onClose}
+                        className="p-2 hover:bg-white/20 rounded-xl transition-colors text-white"
+                    >
+                        <X size={24} />
                     </button>
                 </div>
 
-                <div className="p-6 space-y-8">
+                {/* Content */}
+                <div className="overflow-y-auto max-h-[calc(90vh-180px)] p-8 space-y-6">
+                    {/* Statistics */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="bg-white p-6 rounded-2xl border border-purple-100 shadow-sm relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-purple-50 rounded-full blur-xl -mr-12 -mt-12 group-hover:bg-purple-100 transition-colors"></div>
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-sm font-bold text-purple-600 uppercase">Total Venues</p>
+                                    <Building2 className="text-purple-300" size={24} />
+                                </div>
+                                <p className="text-3xl font-bold text-gray-900">{owner.stats?.total_venues || 0}</p>
+                            </div>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl border border-blue-100 shadow-sm relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-50 rounded-full blur-xl -mr-12 -mt-12 group-hover:bg-blue-100 transition-colors"></div>
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-sm font-bold text-blue-600 uppercase">Total Bookings</p>
+                                    <Calendar className="text-blue-300" size={24} />
+                                </div>
+                                <p className="text-3xl font-bold text-gray-900">{owner.stats?.total_bookings || 0}</p>
+                            </div>
+                        </div>
+                        <div className="bg-white p-6 rounded-2xl border border-green-100 shadow-sm relative overflow-hidden group">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-green-50 rounded-full blur-xl -mr-12 -mt-12 group-hover:bg-green-100 transition-colors"></div>
+                            <div className="relative">
+                                <div className="flex items-center justify-between mb-2">
+                                    <p className="text-sm font-bold text-green-600 uppercase">Total Revenue</p>
+                                    <span className="text-2xl">💰</span>
+                                </div>
+                                <p className="text-3xl font-bold text-gray-900">{formatCurrency(owner.stats?.total_revenue || 0)}</p>
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Personal & Business Info */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Personal Information</h3>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Personal Information */}
+                        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+                                    <Mail className="text-blue-600" size={20} />
+                                </div>
+                                Personal Information
+                            </h3>
                             <div className="space-y-3">
-                                <div className="flex justify-between py-2 border-b border-gray-50">
-                                    <span className="text-gray-600">Full Name</span>
-                                    <span className="font-medium text-gray-900">{owner.owner?.name}</span>
+                                <div>
+                                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">Full Name</p>
+                                    <p className="font-semibold text-gray-900">{owner.owner?.name}</p>
                                 </div>
-                                <div className="flex justify-between py-2 border-b border-gray-50">
-                                    <span className="text-gray-600">Email</span>
-                                    <span className="font-medium text-gray-900">{owner.owner?.email}</span>
+                                <div>
+                                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">Email</p>
+                                    <p className="font-semibold text-gray-700 break-all">{owner.owner?.email}</p>
                                 </div>
-                                <div className="flex justify-between py-2 border-b border-gray-50">
-                                    <span className="text-gray-600">Phone</span>
-                                    <span className="font-medium text-gray-900">{owner.owner?.phone}</span>
+                                <div>
+                                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">Phone</p>
+                                    <p className="font-semibold text-gray-900">{owner.owner?.phone}</p>
                                 </div>
-                                <div className="flex justify-between py-2 border-b border-gray-50">
-                                    <span className="text-gray-600">Joined</span>
-                                    <span className="font-medium text-gray-900">
-                                        {new Date(owner.owner?.user_created_at).toLocaleDateString()}
-                                    </span>
+                                <div>
+                                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">Member Since</p>
+                                    <p className="font-semibold text-gray-900">{formatDate(owner.owner?.user_created_at)}</p>
                                 </div>
                             </div>
                         </div>
 
-                        <div>
-                            <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Business Details</h3>
+                        {/* Business Details */}
+                        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                                <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
+                                    <Building2 className="text-purple-600" size={20} />
+                                </div>
+                                Business Details
+                            </h3>
                             <div className="space-y-3">
-                                <div className="flex justify-between py-2 border-b border-gray-50">
-                                    <span className="text-gray-600">Business Name</span>
-                                    <span className="font-medium text-gray-900">{owner.owner?.business_name || 'N/A'}</span>
+                                <div>
+                                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">Business Name</p>
+                                    <p className="font-semibold text-gray-900">{owner.owner?.business_name || 'N/A'}</p>
                                 </div>
-                                <div className="flex justify-between py-2 border-b border-gray-50">
-                                    <span className="text-gray-600">CNIC</span>
-                                    <span className="font-medium text-gray-900">{owner.owner?.cnic || 'N/A'}</span>
+                                <div>
+                                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">CNIC</p>
+                                    <p className="font-semibold text-gray-900">{owner.owner?.cnic || 'N/A'}</p>
                                 </div>
-                                <div className="flex justify-between py-2 border-b border-gray-50">
-                                    <span className="text-gray-600">Verification Status</span>
-                                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${owner.owner?.verification_status === 'verified' ? 'bg-green-100 text-green-800' :
-                                        owner.owner?.verification_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                            'bg-gray-100 text-gray-800'
+                                <div>
+                                    <p className="text-xs font-bold text-gray-500 uppercase mb-1">Verification Status</p>
+                                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold border ${owner.owner?.verification_status === 'verified' ? 'bg-green-50 text-green-700 border-green-200' :
+                                            owner.owner?.verification_status === 'pending' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                                                'bg-gray-50 text-gray-700 border-gray-200'
                                         }`}>
                                         {owner.owner?.verification_status || 'Unverified'}
                                     </span>
@@ -308,55 +365,43 @@ const OwnerDetailsModal = ({ owner, onClose, onVenueClick }) => {
                         </div>
                     </div>
 
-                    {/* Statistics */}
-                    <div>
-                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Performance Overview</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
-                                <div className="text-purple-600 text-sm font-medium mb-1">Total Venues</div>
-                                <div className="text-2xl font-bold text-gray-900">{owner.stats?.total_venues || 0}</div>
-                            </div>
-                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                <div className="text-blue-600 text-sm font-medium mb-1">Total Bookings</div>
-                                <div className="text-2xl font-bold text-gray-900">{owner.stats?.total_bookings || 0}</div>
-                            </div>
-                            <div className="bg-green-50 p-4 rounded-xl border border-green-100">
-                                <div className="text-green-600 text-sm font-medium mb-1">Total Revenue</div>
-                                <div className="text-2xl font-bold text-gray-900">{formatCurrency(owner.stats?.total_revenue || 0)}</div>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* Venues List */}
-                    <div>
-                        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Venues ({owner.venues?.length || 0})</h3>
-                        <div className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-                            {owner.venues && owner.venues.length > 0 ? (
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-gray-100 border-b border-gray-200 text-gray-500 font-medium">
+                    <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4">Venues ({owner.venues?.length || 0})</h3>
+                        {owner.venues && owner.venues.length > 0 ? (
+                            <div className="overflow-x-auto rounded-xl border border-gray-200">
+                                <table className="w-full">
+                                    <thead className="bg-gray-50">
                                         <tr>
-                                            <th className="px-4 py-3">Venue Name</th>
-                                            <th className="px-4 py-3">City</th>
-                                            <th className="px-4 py-3">Type</th>
-                                            <th className="px-4 py-3">Bookings</th>
-                                            <th className="px-4 py-3 text-right">Revenue</th>
-                                            <th className="px-4 py-3 text-center">Status</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Venue</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Location</th>
+                                            <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Type</th>
+                                            <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Bookings</th>
+                                            <th className="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Revenue</th>
+                                            <th className="px-6 py-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-200">
+                                    <tbody className="divide-y divide-gray-100 bg-white">
                                         {owner.venues.map((venue) => (
                                             <tr
                                                 key={venue.venue_id}
-                                                className="hover:bg-gray-100 cursor-pointer transition-colors"
+                                                className="hover:bg-blue-50/50 cursor-pointer transition-colors group"
                                                 onClick={() => onVenueClick && onVenueClick(venue.venue_id)}
                                             >
-                                                <td className="px-4 py-3 font-medium text-gray-900">{venue.name}</td>
-                                                <td className="px-4 py-3 text-gray-600">{venue.city}</td>
-                                                <td className="px-4 py-3 text-gray-600">{venue.type}</td>
-                                                <td className="px-4 py-3 text-gray-600">{venue.bookings_count}</td>
-                                                <td className="px-4 py-3 text-right text-gray-900 font-medium">{formatCurrency(venue.revenue)}</td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <span className={`px-2 py-0.5 text-xs rounded-full ${venue.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                <td className="px-6 py-4">
+                                                    <p className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{venue.name}</p>
+                                                </td>
+                                                <td className="px-6 py-4 text-gray-700">{venue.city}</td>
+                                                <td className="px-6 py-4 text-gray-700 capitalize">{venue.type}</td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm font-bold border border-blue-100">
+                                                        {venue.bookings_count}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right font-bold text-gray-900">{formatCurrency(venue.revenue)}</td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <span className={`px-3 py-1 text-xs font-bold rounded-full border ${venue.status === 'active' ? 'bg-green-50 text-green-700 border-green-200' :
+                                                            'bg-red-50 text-red-700 border-red-200'
                                                         }`}>
                                                         {venue.status}
                                                     </span>
@@ -365,17 +410,47 @@ const OwnerDetailsModal = ({ owner, onClose, onVenueClick }) => {
                                         ))}
                                     </tbody>
                                 </table>
-                            ) : (
-                                <div className="p-8 text-center text-gray-500">No venues listed yet.</div>
-                            )}
-                        </div>
+                            </div>
+                        ) : (
+                            <div className="p-12 text-center bg-gray-50 rounded-xl border border-gray-200">
+                                <Building2 className="mx-auto text-gray-300 mb-3" size={48} />
+                                <p className="text-gray-500">No venues listed yet</p>
+                            </div>
+                        )}
                     </div>
+
+                    {/* Recent Bookings */}
+                    {owner.recent_bookings && owner.recent_bookings.length > 0 && (
+                        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                            <h3 className="text-lg font-bold text-gray-900 mb-4">Recent Bookings</h3>
+                            <div className="space-y-3">
+                                {owner.recent_bookings.map((booking) => (
+                                    <div key={booking.booking_id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100 hover:bg-blue-50 transition-colors">
+                                        <div>
+                                            <p className="font-bold text-gray-900">{booking.venue_name}</p>
+                                            <p className="text-sm text-gray-500">{formatDate(booking.event_date)}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-bold text-gray-900">{formatCurrency(booking.total_price)}</p>
+                                            <span className={`text-xs px-2 py-1 rounded-full ${booking.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                                                    booking.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                                        'bg-gray-100 text-gray-700'
+                                                }`}>
+                                                {booking.status}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                <div className="p-6 border-t border-gray-100 bg-gray-50 rounded-b-xl flex justify-end">
+                {/* Footer */}
+                <div className="sticky bottom-0 bg-white border-t border-gray-200 px-8 py-4">
                     <button
                         onClick={onClose}
-                        className="px-6 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium shadow-sm"
+                        className="w-full bg-gray-900 text-white py-3 rounded-xl hover:bg-black transition-colors font-medium shadow-lg shadow-gray-900/20"
                     >
                         Close
                     </button>

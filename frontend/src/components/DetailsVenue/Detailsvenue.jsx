@@ -10,7 +10,6 @@ import VenueAbout from './VenueAbout';
 import VenueFacilities from './VenueFacilities';
 import VenueReviews from './VenueReviews';
 import BookingSection from './BookingSection';
-import './VenueDetails.css';
 
 const VenueDetails = () => {
   const { id } = useParams();
@@ -51,15 +50,15 @@ const VenueDetails = () => {
 
   if (error || !venue) {
     return (
-      <div className="min-h-screen flex flex-col">
+      <div className="min-h-screen flex flex-col bg-gray-50">
         <Navbar />
         <div className="flex-1 flex items-center justify-center pt-20">
-          <div className="text-center">
+          <div className="text-center p-8 bg-white/80 backdrop-blur-md rounded-3xl shadow-xl max-w-md mx-4">
             <h2 className="text-2xl font-bold text-red-600 mb-2">Error Loading Venue</h2>
-            <p className="text-gray-600">{error || 'Venue not found'}</p>
+            <p className="text-gray-600 mb-6">{error || 'Venue not found'}</p>
             <button
               onClick={() => navigate('/venues')}
-              className="mt-4 flex items-center gap-2 text-blue-600 hover:text-blue-800 mx-auto"
+              className="flex items-center gap-2 text-white bg-blue-600 hover:bg-blue-700 px-6 py-3 rounded-xl mx-auto transition-all shadow-lg hover:shadow-xl"
             >
               <ArrowLeft className="w-4 h-4" /> Back to Venues
             </button>
@@ -71,43 +70,63 @@ const VenueDetails = () => {
   }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <Navbar />
+    <div className="min-h-screen flex flex-col bg-gray-50 relative overflow-hidden">
+      {/* Background Blobs */}
+      <div className="absolute top-0 right-0 -mt-20 -mr-20 w-[800px] h-[800px] bg-blue-50/40 rounded-full blur-3xl pointer-events-none z-0"></div>
+      <div className="absolute bottom-0 left-0 -mb-20 -ml-20 w-[600px] h-[600px] bg-purple-50/40 rounded-full blur-3xl pointer-events-none z-0"></div>
 
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 py-8 pt-20">
-        {/* Back Button */}
-        <button
-          onClick={() => navigate('/venues')}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-        >
-          <ArrowLeft className="w-5 h-5" /> Back to Venues
-        </button>
+      <div className="relative z-10">
+        <Navbar />
 
-        {/* Venue Header */}
-        <VenueHeader venue={venue} />
+        <main className="flex-1 max-w-7xl mx-auto w-full px-4 md:px-8 py-8 pt-24 min-h-screen">
+          {/* Back Button */}
+          <button
+            onClick={() => navigate('/venues')}
+            className="mb-8 flex items-center gap-2 text-gray-500 hover:text-blue-600 transition-colors font-medium group"
+          >
+            <div className="p-2 bg-white rounded-full shadow-sm group-hover:shadow-md transition-all">
+              <ArrowLeft className="w-5 h-5" />
+            </div>
+            Back to Venues
+          </button>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Content Sections */}
-          <div className="lg:col-span-2 space-y-8">
-            <VenueAbout description={venue.description} />
+          {/* Venue Header */}
+          <VenueHeader venue={venue} />
 
-            {venue.facilities && venue.facilities.length > 0 && (
-              <VenueFacilities facilities={venue.facilities} />
-            )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+            {/* Left Column - Content Sections */}
+            <div className="lg:col-span-2 space-y-8">
+              <VenueAbout description={venue.description} />
 
-            {venue.reviews && venue.reviews.length > 0 && (
-              <VenueReviews reviews={venue.reviews} />
-            )}
+              {venue.facilities && venue.facilities.length > 0 && (
+                <VenueFacilities facilities={venue.facilities} />
+              )}
+
+              {venue.reviews && venue.reviews.length > 0 && (
+                <VenueReviews
+                  reviews={venue.reviews}
+                  venueId={id}
+                  onReviewAdded={fetchVenueDetails}
+                />
+              )}
+              {(!venue.reviews || venue.reviews.length === 0) && (
+                <VenueReviews
+                  reviews={[]}
+                  venueId={id}
+                  onReviewAdded={fetchVenueDetails}
+                />
+              )}
+            </div>
+
+            {/* Right Column - Booking Section */}
+            <div className="lg:col-span-1">
+              <BookingSection venue={venue} />
+            </div>
           </div>
+        </main>
 
-          {/* Right Column - Booking Section */}
-          <div className="lg:col-span-1">
-            <BookingSection venue={venue} />
-          </div>
-        </div>
-      </main>
-
-      <Footer />
+        <Footer />
+      </div>
     </div>
   );
 };
