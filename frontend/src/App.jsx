@@ -9,7 +9,6 @@ import VenueDetails from "./components/DetailsVenue/Detailsvenue.jsx";
 import VenueBookingForm from "./components/VenueBookingForm/VenueBookingForm.jsx";
 import VenueBookingRequest from "./components/VenueBookingRequest/VenueBookingRequest.jsx";
 import OwnerPanel from "./components/Profile/OwnerPanel.jsx";
-import AntigravityPanel from "./components/Antigravity/AntigravityPanel";
 import AdminDashboard from "./components/dashboardLayout/AdminDashboard";
 import Dashboard from "./components/dashboardLayout/Dashboard";
 import DashboardLayout from "./components/dashboardLayout/DashboardLayout";
@@ -55,7 +54,6 @@ const App = () => {
           <Route path="/booking-form" element={<VenueBookingForm />} />
           <Route path="/booking-request" element={<VenueBookingRequest />} />
           <Route path="/owner" element={<OwnerPanel />} />
-          <Route path="/antigravity" element={<AntigravityPanel />} />
           <Route path="/profile" element={<UserProfile />} />
           <Route path="/my-bookings" element={<UserBookingsPage />} />
           <Route path="/owner/dashboard" element={<Dashboard />} />
