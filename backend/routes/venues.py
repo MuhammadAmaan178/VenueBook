@@ -190,14 +190,30 @@ def get_booking_data(venue_id):
         facilities = cursor.fetchall()
         
         # Get availability for specific date if provided
-        availability = None
+        # Use a map to ensure unique slots and handle overrides
+        availability_map = {
+            'morning': True,
+            'evening': True,
+            'full-day': True
+        }
+        
         if event_date:
             cursor.execute("""
                 SELECT slot, is_available
                 FROM venue_availability
                 WHERE venue_id = %s AND date = %s
             """, (venue_id, event_date))
-            availability = cursor.fetchall()
+            results = cursor.fetchall()
+            
+            for row in results:
+                if row['slot'] in availability_map:
+                    # If any record identifies slot as unavailable, mark it so
+                    if not row['is_available']:
+                        availability_map[row['slot']] = False
+
+        # Convert back to list format
+        availability = [{'slot': slot, 'is_available': 1 if is_active else 0} 
+                       for slot, is_active in availability_map.items()]
         
         # Get payment info
         cursor.execute("""

@@ -8,7 +8,9 @@ from datetime import datetime
 from flask import Blueprint, request, jsonify
 
 from utils.db import get_db_connection
+from utils.db import get_db_connection
 from utils.decorators import token_required, admin_required
+from utils.notification_utils import notify_venue_status_changed
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -681,26 +683,12 @@ def approve_venue(venue_id):
         
         cursor.execute("UPDATE venues SET status = 'active' WHERE venue_id = %s", (venue_id,))
         
-        # Notify owner
-        cursor.execute("""
-            SELECT u.user_id, v.name 
-            FROM venues v
-            JOIN owners o ON v.owner_id = o.owner_id
-            JOIN users u ON o.user_id = u.user_id
-            WHERE v.venue_id = %s
-        """, (venue_id,))
-        result = cursor.fetchone()
-        
-        if result:
-            message = f"Your venue '{result['name']}' has been approved."
-            cursor.execute("""
-                INSERT INTO notifications (user_id, title, message, type, venue_id, is_read, created_at)
-                VALUES (%s, 'Venue Approved', %s, 'venue', %s, 0, NOW())
-            """, (result['user_id'], message, venue_id))
-        
         conn.commit()
         cursor.close()
         conn.close()
+
+        # Notify owner
+        notify_venue_status_changed(venue_id, 'approved')
         
         return jsonify({'message': 'Venue approved successfully'}), 200
         
@@ -724,27 +712,13 @@ def update_venue_status(venue_id):
         
         cursor.execute("UPDATE venues SET status = %s WHERE venue_id = %s", (status, venue_id))
         
-        # Notify owner if rejected
-        if status == 'rejected':
-            cursor.execute("""
-                SELECT u.user_id, v.name 
-                FROM venues v
-                JOIN owners o ON v.owner_id = o.owner_id
-                JOIN users u ON o.user_id = u.user_id
-                WHERE v.venue_id = %s
-            """, (venue_id,))
-            result = cursor.fetchone()
-            
-            if result:
-                message = f"Your venue '{result['name']}' has been rejected."
-                cursor.execute("""
-                    INSERT INTO notifications (user_id, title, message, type, venue_id, is_read, created_at)
-                    VALUES (%s, 'Venue Rejected', %s, 'venue', %s, 0, NOW())
-                """, (result['user_id'], message, venue_id))
-        
         conn.commit()
         cursor.close()
         conn.close()
+        
+        # Notify owner if status is significant
+        if status in ['approved', 'rejected', 'active']:
+             notify_venue_status_changed(venue_id, status)
         
         return jsonify({'message': f'Venue status updated to {status}'}), 200
         

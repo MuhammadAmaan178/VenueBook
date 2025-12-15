@@ -460,6 +460,26 @@ export const adminService = {
     });
     return handleResponse(response);
   },
+
+  approveVenue: async (venueId, token) => {
+    const response = await fetch(`${API_BASE_URL}/api/admin/venues/${venueId}/approve`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    return handleResponse(response);
+  },
+
+  updateVenueStatus: async (venueId, status, token) => {
+    const response = await fetch(`${API_BASE_URL}/api/admin/venues/${venueId}/status`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ status }),
+    });
+    return handleResponse(response);
+  },
 };
 
 export const notificationService = {

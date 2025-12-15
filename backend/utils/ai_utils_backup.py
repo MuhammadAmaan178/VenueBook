@@ -12,6 +12,38 @@ groq_client = Groq(api_key=api_key) if api_key else None
 CONFIDENTIAL_FIELDS = get_confidential_fields()
 
 
+def detect_language(text):
+    """
+    Detect the language of user input.
+    Returns: 'urdu', 'hindi', 'roman_urdu', or 'english'
+    """
+    # Check for Urdu/Hindi Unicode characters
+    urdu_hindi_chars = 0
+    for char in text:
+        if '\u0600' <= char <= '\u06FF' or '\u0900' <= char <= '\u097F':  # Urdu/Hindi Unicode ranges
+            urdu_hindi_chars += 1
+    
+    # If more than 30% of non-space chars are Urdu/Hindi, it's native script
+    non_space_chars = len([c for c in text if not c.isspace()])
+    if non_space_chars > 0 and (urdu_hindi_chars / non_space_chars) > 0.3:
+        return 'urdu'  # Could be Hindi too, but we'll treat similarly
+    
+    # Check for common Roman Urdu/Hindi words
+    roman_urdu_keywords = [
+        'kya', 'hai', 'hain', 'mein', 'ko', 'ka', 'ki', 'ke', 'se', 'ne',
+        'kitne', 'kahan', 'kaise', 'kyun', 'venue', 'booking', 'price',
+        'shaadi', 'mehngai', 'sasti', 'acchi', 'kitna', 'dikhao', 'batao'
+    ]
+    
+    text_lower = text.lower()
+    roman_urdu_count = sum(1 for keyword in roman_urdu_keywords if keyword in text_lower)
+    
+    if roman_urdu_count >= 2:
+        return 'roman_urdu'
+    
+    return 'english'
+
+
 def get_conversation_history(conversation_id, limit=3):
     """
     Retrieve recent conversation history for context.
@@ -233,6 +265,11 @@ def validate_sql_security(sql_query):
             if pattern in sql_lower:
                 return False, f"Confidential field '{field}' cannot be queried"
     
+    # Check 4: Ensure LIMIT exists (add if missing)
+    if 'LIMIT' not in sql_upper:
+        # Will add LIMIT in execute function
+        pass
+    
     return True, "Query is safe"
 
 
@@ -262,7 +299,142 @@ def execute_safe_query(sql_query):
         return None, str(e)
 
 
-def format_query_results(user_question, results, sql_query, is_recommendation=False):
+def format_query_results(user_question, results, sql_query, is_recommendation=False, language='english'):
+    """
+    Step 4: Format SQL results into natural language using Groq.
+    Supports multiple languages.
+    """
+    if not api_key or not groq_client:
+        return "I am not fully configured yet (Missing API Key)."
+    
+    if results is None:
+        return "Sorry, there was an error executing the query."
+    
+    if len(results) == 0:
+        if language == 'urdu':
+            return "Hmm, mujhe is sawaal ka koi data nahi mila. Kya aap isko dusre tareeqe se pooch sakte hain? Main yahan madad ke liye hoon! 😊"
+        elif language == 'roman_urdu':
+            return "Hmm, mujhe iska koi data nahi mila. Kya aap isse dusre tarah se puchh sakte hain? Main help ke liye hazir hoon! 😊"
+        else:
+            return "Hmm, I couldn't find any data for that. Could you try asking in a different way, or maybe check the spelling? I'm here to help! 😊"
+    
+    # Format results for AI consumption
+    # Limit to first 50 rows to prevent payload issues
+    limited_results = results[:50]
+    
+    # Convert to simple format
+    if len(limited_results) == 1 and len(limited_results[0]) == 1:
+        # Single value result (like COUNT, SUM, AVG)
+        result_data = f"Result: {list(limited_results[0].values())[0]}"
+    else:
+        # Multiple rows/columns
+        result_data = []
+        for row in limited_results:
+            result_data.append(dict(row))
+        
+        result_data = json.dumps(result_data, default=str, indent=2)
+    
+    # Language-specific instructions
+    language_instructions = {
+        'english': """Now, provide a natural, conversational answer. Be friendly and helpful!
+
+Guidelines:
+- Talk naturally like you're chatting with a friend, not writing a formal report
+- Use contractions (I've, you're, there's) to sound more human
+- Be enthusiastic and helpful without being overly formal
+- Use markdown formatting (**bold** for important info, lists for multiple items)
+- If showing numbers, provide context or insights when helpful
+- Keep it concise but friendly
+- Feel free to add helpful suggestions or related info
+- Don't mention SQL or technical details unless specifically asked
+- Sound like an AI assistant (Gemini/ChatGPT style), not a database bot""",
+        
+        'urdu': """اب ایک قدرتی، دوستانہ جواب دیں! اردو میں جواب دیں۔
+
+رہنمائی:
+- دوستانہ انداز میں بات کریں، رسمی رپورٹ نہیں
+- پرجوش اور مددگار رہیں
+- اہم معلومات کو **bold** میں لکھیں
+- اگر نمبرز دکھا رہے ہیں تو سیاق و سباق فراہم کریں
+- مختصر لیکن دوستانہ رہیں
+- مددگار تجاویز شامل کریں
+- SQL یا تکنیکی تفصیلات کا ذکر نہ کریں
+- AI assistant کی طرح بات کریں، database bot کی طرح نہیں""",
+        
+        'roman_urdu': """Ab ek natural, friendly jawab dein! Roman Urdu mein respond karein.
+
+Guidelines:
+- Dostana andaaz mein baat karein, formal report nahi
+- Enthusiastic aur helpful rahein
+- Important info ko **bold** mein likhein
+- Agar numbers dikha rahe hain to context provide karein
+- Concise lekin friendly rahein
+- Helpful suggestions shamil karein
+- SQL ya technical details ka zikr na karein
+- AI assistant ki tarah baat karein, database bot ki tarah nahi"""
+    }
+    
+    recommendation_note = ""
+    if is_recommendation:
+        if language == 'urdu':
+            recommendation_note = "\n\nاہم: صارف سفارش چاہتا ہے، صرف ڈیٹا نہیں۔ نتائج کا تجزیہ کریں اور بہترین آپشن تجویز کریں اور وجوہات بتائیں!"
+        elif language == 'roman_urdu':
+            recommendation_note = "\n\nIMPORTANT: User recommendation chahta hai, sirf data nahi. Results ka analysis karein aur BEST option suggest karein wajoohat ke saath!"
+        else:
+            recommendation_note = "\n\nIMPORTANT: The user wants a RECOMMENDATION, not just data. Analyze the results and suggest the BEST option with reasons why!"
+    
+    lang_instruction = language_instructions.get(language, language_instructions['english'])
+    
+    prompt = f"""You are VenueBot, a friendly and helpful AI assistant for VenueBook.
+
+User asked: {user_question}
+
+I've retrieved this data from the database:
+{result_data}{recommendation_note}
+
+{lang_instruction}
+
+Example good responses:
+- "I found 15 venues in Karachi! They include..."
+- "Great question! The average rating is 4.3 stars, which is pretty solid."
+- "Here are the top 5 rated venues you asked about..."
+- "Looking at the data, wedding hall bookings are super popular - they make up about 60% of all bookings!"
+"""
+    
+    try:
+        print(f"AI Utils: Formatting results in {language}...")
+        
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            model="llama-3.1-8b-instant",
+            temperature=0.8,  # Higher for natural, conversational tone
+            max_tokens=800
+        )
+        
+        response = chat_completion.choices[0].message.content
+        
+        # Add context if results were limited
+        if len(results) > 50:
+            if language in ['urdu', 'roman_urdu']:
+                response += f"\n\n*(Pehle 50 results dikha rahe hain, total {len(results)} hain)*"
+            else:
+                response += f"\n\n*(Showing first 50 of {len(results)} total results)*"
+        
+        print(f"AI Utils: Successfully formatted response in {language}")
+        return response
+        
+    except Exception as e:
+        print(f"AI Utils: Error formatting results: {e}")
+        # Fallback: return raw results
+        if len(results) == 1 and len(results[0]) == 1:
+            return f"Result: {list(results[0].values())[0]}"
+        else:
+            return f"Found {len(results)} results."
     """
     Step 4: Format SQL results into natural language using Groq.
     """
@@ -358,6 +530,37 @@ Example good responses:
 def generate_information_bot_response(user_question, conversation_id=None):
     """
     Main function: Comprehensive information bot using SQL generation.
+    Supports multiple languages: English, Urdu, Hindi, Roman Urdu.
+    
+    Process:
+    0. Detect language
+    1. Get conversation history (if available)
+    2. Check if it's casual conversation (greeting/small talk)
+    3. Check for how-to/procedural questions
+    4. Check for venue comparison
+    5. Generate SQL from natural language
+    6. Validate SQL for security
+    7. Execute query safely
+    8. Format results naturally in user's language
+    """
+    if not api_key or not groq_client:
+        return "I am not fully configured yet (Missing API Key)."
+    
+    # Step 0: Detect language
+    detected_language = detect_language(user_question)
+    print(f"AI Utils: Detected language: {detected_language}")
+    """
+    Main function: Comprehensive information bot using SQL generation.
+    
+    Process:
+    0. Get conversation history (if available)
+    1. Check if it's casual conversation (greeting/small talk)
+    2. Check for how-to/procedural questions
+    3. Check for venue comparison
+    4. Generate SQL from natural language
+    5. Validate SQL for security
+    6. Execute query safely
+    7. Format results naturally
     """
     if not api_key or not groq_client:
         return "I am not fully configured yet (Missing API Key)."
@@ -514,6 +717,8 @@ We're here to help resolve any issues quickly! 💪"""
         }
     }
     
+    question_lower = user_question.lower()
+    
     # Check for how-to questions
     for category, data in how_to_patterns.items():
         if any(keyword in question_lower for keyword in data['keywords']):
@@ -547,7 +752,7 @@ We're here to help resolve any issues quickly! 💪"""
         return f"Oops, I ran into a technical issue while looking that up. Could you try asking in a different way? 🤔"
     
     # Step 8: Format results
-    response = format_query_results(user_question, results, sql_query, is_recommendation)
+    response = format_query_results(user_question, results, sql_query, is_recommendation, detected_language)
     
     return response
 

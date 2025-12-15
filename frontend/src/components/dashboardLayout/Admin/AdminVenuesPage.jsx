@@ -190,6 +190,37 @@ const AdminVenuesPage = () => {
         }
     };
 
+    const handleApproveVenue = async (venueId) => {
+        if (!window.confirm("Are you sure you want to approve this venue?")) return;
+        try {
+            const token = localStorage.getItem('token');
+            await adminService.approveVenue(venueId, token);
+            alert("Venue approved successfully");
+            setShowVenueDetails(false);
+            fetchVenues(); // Refresh list
+        } catch (error) {
+            console.error("Error approving venue:", error);
+            alert("Failed to approve venue");
+        }
+    };
+
+    const handleRejectVenue = async (venueId, currentStatus) => {
+        const action = currentStatus === 'active' ? 'deactivate' : 'reject';
+        if (!window.confirm(`Are you sure you want to ${action} this venue?`)) return;
+
+        try {
+            const token = localStorage.getItem('token');
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'rejected';
+            await adminService.updateVenueStatus(venueId, newStatus, token);
+            alert(`Venue ${action}ed successfully`);
+            setShowVenueDetails(false);
+            fetchVenues(); // Refresh list
+        } catch (error) {
+            console.error(`Error ${action}ing venue:`, error);
+            alert(`Failed to ${action} venue`);
+        }
+    };
+
     return (
         <div className="p-6">
             {/* Header Section */}
@@ -450,6 +481,8 @@ const AdminVenuesPage = () => {
                         setShowVenueDetails(false);
                         setSelectedVenue(null);
                     }}
+                    onApprove={() => handleApproveVenue(selectedVenue.venue_id)}
+                    onReject={() => handleRejectVenue(selectedVenue.venue_id, selectedVenue.status)}
                 />
             )}
         </div>

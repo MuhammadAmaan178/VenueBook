@@ -2,7 +2,7 @@
 import React from 'react';
 import { X, MapPin, Users, DollarSign, Star, Building2, Calendar, Check, Image as ImageIcon } from 'lucide-react';
 
-const VenueDetailsModal = ({ venue, onClose }) => {
+const VenueDetailsModal = ({ venue, onClose, onApprove, onReject }) => {
     if (!venue) return null;
 
     const formatCurrency = (amount) => {
@@ -225,11 +225,28 @@ const VenueDetailsModal = ({ venue, onClose }) => {
                     )}
                 </div>
 
-                {/* Footer */}
-                <div className="sticky bottom-0 bg-white border-t border-gray-200 px-8 py-4">
+                <div className="sticky bottom-0 bg-white border-t border-gray-200 px-8 py-4 flex gap-3">
+                    {onApprove && venue.status !== 'active' && (
+                        <button
+                            onClick={onApprove}
+                            className="flex-1 bg-green-600 text-white py-3 rounded-xl hover:bg-green-700 transition-colors font-bold shadow-lg shadow-green-200"
+                        >
+                            Approve Venue
+                        </button>
+                    )}
+
+                    {onReject && venue.status !== 'rejected' && (
+                        <button
+                            onClick={onReject}
+                            className="flex-1 bg-red-600 text-white py-3 rounded-xl hover:bg-red-700 transition-colors font-bold shadow-lg shadow-red-200"
+                        >
+                            {venue.status === 'active' ? 'Deactivate Venue' : 'Reject Venue'}
+                        </button>
+                    )}
+
                     <button
                         onClick={onClose}
-                        className="w-full bg-gray-900 text-white py-3 rounded-xl hover:bg-black transition-colors font-medium shadow-lg shadow-gray-900/20"
+                        className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-xl hover:bg-gray-200 transition-colors font-bold"
                     >
                         Close
                     </button>

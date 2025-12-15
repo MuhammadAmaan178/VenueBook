@@ -7,8 +7,8 @@ ai_bp = Blueprint('ai', __name__)
 @ai_bp.route('/ask', methods=['POST'])
 def ask_ai():
     # Helper to check API key indirectly (optional, handled in util)
-    if not os.getenv('GEMINI_API_KEY'):
-         return jsonify({'error': 'Gemini API Key not configured'}), 503
+    if not os.getenv('GROQ_API_KEY'):
+         return jsonify({'error': 'Groq API Key not configured'}), 503
 
     data = request.json
     user_message = data.get('message', '')

@@ -114,9 +114,9 @@ const VenueBookingForm = () => {
                 trx_id: formData.transactionId
             };
 
-            // Map 'bank' to 'bank_transfer' for backend enum compatibility
+            // Map 'bank' to 'bank-transfer' for backend enum compatibility
             if (bookingPayload.payment_method === 'bank') {
-                bookingPayload.payment_method = 'bank_transfer';
+                bookingPayload.payment_method = 'bank-transfer';
             }
 
             await bookingService.createBooking(bookingPayload, token);
