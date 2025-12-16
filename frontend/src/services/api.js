@@ -1,5 +1,5 @@
 // src/services/api.js
-export const API_BASE_URL = 'http://localhost:5000';
+export const API_BASE_URL = 'https://huggingface.co/spaces/Amaan909/Venue_Finder';
 
 const handleResponse = async (response) => {
   if (!response.ok) {
